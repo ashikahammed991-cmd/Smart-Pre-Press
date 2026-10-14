@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Pre-Press</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">SP</div><div><strong>Smart Pre-Press</strong><small>Production Studio</small></div></div>
+      <div class="nav-label">WORKSPACE</div>
+      <button class="nav-item active" data-section="workspace">▦ <span>Workspace</span></button>
+      <button class="nav-item" data-section="mapping">⌗ <span>Data Mapping</span></button>
+      <button class="nav-item" data-section="layout">▤ <span>Auto UPS & Layout</span></button>
+      <button class="nav-item" data-section="output">⇧ <span>Output & Costing</span></button>
+      <div class="sidebar-bottom"><span class="status-dot"></span> Local project workspace<small>Version 0.1 starter</small></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div><div class="eyebrow">PRE-PRESS WORKFLOW</div><h1 id="pageTitle">Workspace</h1></div><div class="top-actions"><span class="pill">● Ready to configure</span><div class="avatar">SP</div></div></header>
+      <section class="intro">
+        <div><h2>Prepare your tag production</h2><p>Import artwork and data, map fields, then build your layout.</p></div>
+        <div class="stepper"><span class="step done">1 <small>Import</small></span><i></i><span class="step">2 <small>Map</small></span><i></i><span class="step">3 <small>Layout</small></span><i></i><span class="step">4 <small>Output</small></span></div>
+      </section>
+      <section class="cards">
+        <article class="panel import-panel">
+          <div class="panel-heading"><div class="icon-box blue">▧</div><div><h3>Master Tag Artwork</h3><p>Choose your source design file</p></div><span class="tag">STEP 01</span></div>
+          <div class="dropzone" id="artDrop"><div class="file-symbol">AI</div><strong id="artName">Select Master Tag</strong><span>AI, EPS or PDF · Any filename</span><button class="secondary" id="artButton">Browse artwork</button><input type="file" id="artFile" accept=".ai,.eps,.pdf" hidden></div>
+          <div class="file-meta"><span>Artwork file</span><strong id="artStatus">No file selected</strong></div>
+        </article>
+        <article class="panel import-panel">
+          <div class="panel-heading"><div class="icon-box purple">▦</div><div><h3>Excel / CSV Data</h3><p>Import rows for variable data merge</p></div><span class="tag">STEP 02</span></div>
+          <div class="dropzone purple-zone" id="dataDrop"><div class="file-symbol csv">XLS</div><strong id="dataName">Select Data File</strong><span>CSV supported in this starter; XLSX UI ready</span><button class="secondary" id="dataButton">Browse data</button><input type="file" id="dataFile" accept=".csv,.xlsx,.xls" hidden></div>
+          <div class="file-meta"><span>Records detected</span><strong id="rowCount">0 records</strong></div>
+        </article>
+      </section>
+      <section class="panel table-panel">
+        <div class="panel-heading table-heading"><div><h3>Data Preview</h3><p>Check imported columns before mapping</p></div><span class="tag" id="columnCount">0 COLUMNS</span></div>
+        <div class="table-wrap"><table><thead id="tableHead"><tr><th>Import a CSV file to preview columns</th></tr></thead><tbody id="tableBody"><tr><td class="empty">Your data preview will appear here.</td></tr></tbody></table></div>
+      </section>
+      <section class="panel workflow-panel">
+        <div class="panel-heading"><div><div class="icon-box orange">⌘</div></div><div><h3>Choose Production Mode</h3><p>Choose the workflow you want to run</p></div></div>
+        <div class="mode-grid">
+          <label class="mode-card selected"><input type="radio" name="mode" value="layout" checked><div><strong>Only Layout</strong><span>Layout preview only — no cutting marks or costing.</span></div><b>↗</b></label>
+          <label class="mode-card"><input type="radio" name="mode" value="output"><div><strong>Layout & Output</strong><span>Production output, cutting marks and costing workflow.</span></div><b>↗</b></label>
+        </div>
+        <div class="actions"><span class="note">This starter currently configures the workflow UI.</span><button class="primary" id="continueButton">Continue to Data Mapping <span>→</span></button></div>
+      </section>
+      <footer>SMART PRE-PRESS <span>Browser-built Windows desktop application starter</span></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
