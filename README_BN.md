@@ -1,30 +1,29 @@
-# Smart Pre-Press — Browser Build Starter
+# Smart Pre-Press — Version 0.2 (Field Mapping Prototype)
 
-এই প্রজেক্টটি HTML/CSS/JavaScript + Electron দিয়ে Windows ডেস্কটপ অ্যাপ বানানোর starter।
-কোডিং ব্রাউজারে করা যাবে; নিজের কম্পিউটারে Python বা Node.js ইনস্টল করা বাধ্যতামূলক নয়।
-GitHub Actions Windows installer build করবে।
+এটি Smart Pre-Press Windows desktop app-এর পরবর্তী prototype। Electron app GitHub Actions-এর Windows runner দিয়ে build করা যায়; নিজের কম্পিউটারে Node.js ইনস্টল করা বাধ্যতামূলক নয়।
 
-## ব্রাউজার থেকে ব্যবহার
-1. GitHub-এ একটি নতুন repository তৈরি করুন: `Smart-PrePress`
-2. এই ZIP-এর ফাইলগুলো repository-তে upload করুন।
-3. GitHub repository-তে `Actions` tab খুলুন এবং workflow run/finish হওয়া পর্যন্ত অপেক্ষা করুন।
-4. সফল build হলে workflow run-এর নিচে `Artifacts` থেকে `Smart-PrePress-Windows-Installer` ZIP ডাউনলোড করুন।
-5. ZIP খুলে `.exe` installer চালান।
+## এই সংস্করণে কাজ করে
+- Master Tag ফাইল নির্বাচন (AI/EPS/PDF) — ফাইলটি নির্বাচন/নাম দেখায়; artwork-এর ভিতরের live editing এখনো যুক্ত নয়।
+- CSV ফাইল import ও প্রথম কয়েকটি রেকর্ডের preview।
+- CSV column থেকে SKU, Size, Price, Barcode value, QR value এবং custom text field mapping নির্বাচন।
+- প্রথম data record থেকে mapped value preview।
+- Only Layout / Layout & Output workflow নির্বাচন।
+- Windows NSIS installer build (GitHub Actions artifact)।
 
-## কোড এডিট
-- `src/index.html` — অ্যাপের UI
-- `src/styles.css` — ডিজাইন
-- `src/app.js` — UI interactions
-- `main.js` — Electron desktop window
-- `.github/workflows/build-windows.yml` — cloud Windows build
+## এখনো তৈরি হয়নি
+- XLSX/XLS সরাসরি পড়া (Excel থেকে CSV UTF-8 হিসেবে Save As করে import করুন)।
+- AI/EPS/PDF artwork-এর ভিতরে mapped text বসানো বা design editing।
+- বাস্তব barcode/QR image generation।
+- Auto UPS, mixed-size sheet layout, cutting marks, production export ও costing।
 
-## এই starter-এ এখন যা আছে
-- Master Tag ফাইল বাছাই: AI/EPS/PDF
-- CSV/Excel ফাইল বাছাই UI (CSV preview বাস্তবভাবে কাজ করে; XLSX parsing-এর জন্য পরের ধাপে SheetJS যোগ করতে হবে)
-- CSV header ও row preview
-- Mapping mode: existing object/text নির্বাচন বা field box আঁকার জন্য UI
-- Only Layout / Layout & Output mode selector
-- UPS ও spacing controls-এর প্রাথমিক UI
+## GitHub-এ আপডেট
+ZIP-এর ভিতরের path অক্ষুণ্ণ রেখে প্রয়োজনীয় ফাইলগুলো repository-তে upload/replace করুন:
+- `src/index.html`
+- `src/app.js`
+- `src/styles.css`
+- `package.json`
 
-## গুরুত্বপূর্ণ সীমাবদ্ধতা
-এটি এখনো পূর্ণ pre-press production engine নয়। AI/EPS/PDF artwork-এ সরাসরি নিরাপদ text replacement, barcode/QR generation, mixed-size imposition, cutting marks এবং costing এখনো যোগ করা হয়নি। AI/EPS-এর পূর্ণ editing browser-only JavaScript দিয়ে সহজে সম্ভব নয়; প্রথমে PDF-compatible preview/export workflow বানানো সবচেয়ে নির্ভরযোগ্য পথ।
+`main.js` এবং `.github/workflows/build-windows.yml` অপরিবর্তিত রাখা যাবে। `package.json`-এ `--publish never` আছে, তাই build-এর সময় GitHub Release token দরকার হবে না।
+
+## Windows installer তৈরি
+GitHub repository → Actions → Build Smart Pre-Press Windows Installer। সফল run হলে run page-এর Artifacts অংশ থেকে `Smart-PrePress-Windows-Installer` ZIP ডাউনলোড করুন; ZIP extract করে ভিতরের `.exe` চালান।
