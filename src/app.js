@@ -44,3 +44,40 @@ document.addEventListener('click',e=>{if(!$('fileMenu').contains(e.target)){file
 $('menuSavePdf').onclick=()=>{$('exportMerge').click();fileMenuPop.hidden=true};
 $('menuSaveAllPdf').onclick=()=>{$('exportAll').click();fileMenuPop.hidden=true};
 $('menuSaveProject').onclick=()=>{$('saveProject').click();fileMenuPop.hidden=true};
+
+
+// v1.1 consolidated actions: project save/load, UPS duplication, and outer cutting marks.
+$('saveProject').onclick=()=>{
+  try {
+    const project={version:'1.1',items,selected,workflow,dataHeaders,dataRecords,csvRows,recordIndex,templateName,templateDataUrl};
+    downloadBlob(new Blob([JSON.stringify(project,null,2)],{type:'application/json'}),'SmartPrePress-Project.spp');
+    toast('Project saved as .spp');
+  } catch(err){toast('Project save failed: '+err.message)}
+};
+let generatedMarkIds=[];
+$('makeUps').onclick=()=>{
+  const rows=Math.max(1,Math.min(50,parseInt($('upsRows').value,10)||1));
+  const cols=Math.max(1,Math.min(50,parseInt($('upsCols').value,10)||1));
+  const gx=Math.max(0,parseFloat($('upsGapX').value)||0), gy=Math.max(0,parseFloat($('upsGapY').value)||0);
+  const base=items.filter(x=>x.id===selected);
+  if(!base.length){toast('Select one object first to use as the tag artwork.');return}
+  const original=base[0]; snapshot();
+  const startX=original.x,startY=original.y,w=original.w,h=original.h;
+  // Duplicate the selected item in a rows x columns grid. Keep original as top-left item.
+  for(let r=0;r<rows;r++) for(let col=0;col<cols;col++){
+    if(r===0&&col===0) continue;
+    const cp=JSON.parse(JSON.stringify(original));cp.id=crypto.randomUUID();cp.x=startX+col*(w+gx);cp.y=startY+r*(h+gy);items.push(cp);
+  }
+  if($('upsMarks').checked){
+    const len=Math.max(1,parseFloat($('upsMarkLen').value)||8);
+    const right=startX+cols*w+(cols-1)*gx,bottom=startY+rows*h+(rows-1)*gy;
+    const add=(x,y,ww,hh)=>{const m={id:crypto.randomUUID(),type:'line',x,y,w:ww,h:hh,color:'#111111',generatedMark:true};items.push(m);generatedMarkIds.push(m.id)};
+    // Outer corner marks only, extending outward from the overall grid boundary.
+    add(startX-len,startY,-len,0);add(startX,startY-len,0,-len);
+    add(right,startY,len,0);add(right,startY-len,0,-len);
+    add(startX-len,bottom,-len,0);add(startX,bottom,len*0, len);
+    add(right,bottom,len,0);add(right,bottom,len*0,len);
+  }
+  selected=original.id;render();toast(`Created ${rows*cols} UPS positions. Check spacing and marks before output.`);
+};
+$('clearMarks').onclick=()=>{const marks=items.filter(x=>x.generatedMark);if(!marks.length){toast('No generated marks to remove');return}snapshot();items=items.filter(x=>!x.generatedMark);generatedMarkIds=[];render();toast('Generated cutting marks removed')};
