@@ -1,7 +1,7 @@
 {
   "name": "smart-pre-press",
-  "version": "0.9.0",
-  "description": "Integrated Smart Pre-Press editor with workflow-first UI, CSV/XLSX data merge, object editing, undo/redo, project save/load and SVG batch proof export",
+  "version": "1.0.0",
+  "description": "Smart Pre-Press editor with File menu, standard PDF export, SPP project save/load, CSV/XLSX data merge and undo/redo",
   "main": "main.js",
   "author": "Smart Pre-Press",
   "license": "UNLICENSED",
