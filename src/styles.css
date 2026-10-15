@@ -13,3 +13,56 @@
 @media(max-width:760px){.filemenu-pop{left:0}.importbar{align-items:flex-start}}
 
 .layout-panel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;background:#f7f9fc;border-bottom:1px solid #dfe5ee;font-size:12px}.layout-panel b{font-size:13px;margin-right:6px}.layout-panel label{display:flex;align-items:center;gap:5px}.layout-panel input[type=number]{width:64px;padding:5px;border:1px solid #ccd5e2;border-radius:5px}.layout-panel input[type=checkbox]{width:auto}.layout-panel .muted{max-width:230px}.layout-panel button{padding:7px 10px}
+
+
+/* Smart Pre-Press v1.3 visual refresh — reference-inspired dark production workspace */
+:root{color-scheme:dark}
+body{background:#0a1722;color:#e8eef6;font:13px/1.35 "Segoe UI",Arial,sans-serif}
+button,input,select{font:inherit}
+button{background:#102332;border-color:#294253;color:#e8eef6;border-radius:5px}
+button:hover{border-color:#4386d8;background:#18364a}
+button:disabled{opacity:.38}
+.app{grid-template-columns:220px minmax(0,1fr);background:#0a1722}
+.sidebar{background:linear-gradient(180deg,#102333,#0d1b28);border-right:1px solid #294253;box-shadow:none;padding:16px 10px;gap:8px}
+.brand{padding:4px 6px 18px}.logo{border-radius:10px;background:#1677f2}
+.brand b{font-size:15px;color:#fff}.brand small{color:#a8bdd0}
+.nav{color:#c4d4e3;border-radius:5px;padding:12px 10px}.nav.active,.nav:hover{background:#1b3852;color:#fff}
+.top{height:66px;position:static;background:#102333;border-bottom:1px solid #2b4152;padding:10px 20px;color:#fff}
+.top small{color:#8ba7bf}.top h1{font-size:22px;color:#fff}
+.topright button{background:#102333;border-color:#30485b}
+.importbar{margin:10px 10px 8px;background:#102333;border-color:#2b4355;border-radius:5px;padding:9px}
+.importbar span{color:#9db2c5}
+.primary{background:#126df0;border-color:#2581ff;color:#fff}.primary:hover{background:#0c5fd7}
+.secondary{background:#102333;border-color:#344e62;color:#e6edf5}
+.toolbar{margin:0 10px 8px;background:#102333;border-color:#2b4355;border-radius:5px;padding:7px}
+.toolbar label{color:#a7bacb}.toolbar input,.toolbar select{background:#0b1b28;color:#f3f7fb;border-color:#344c5e}
+.toolbar .tool{background:#102333;color:#e7eef5;border-color:#314a5c}.toolbar .tool.selected{background:#126df0;color:#fff;border-color:#368cff}
+.sep{background:#355063}
+.layout-panel{margin:0 10px 8px;background:#102333;border:1px solid #2b4355;border-radius:5px;color:#dbe7f1}
+.layout-panel input{background:#0a1b28;color:#fff;border-color:#345064}
+.workspace{margin:0 10px;grid-template-columns:155px minmax(340px,1fr) 260px;gap:0;min-height:calc(100vh - 300px);border:1px solid #2b4355;background:#0e1e2b}
+.lefttools,.properties{background:#102333;border:0;border-radius:0;padding:12px;color:#e5edf5}
+.lefttools{border-right:1px solid #2b4355}.properties{border-left:1px solid #2b4355}
+.lefttools span{color:#c4d4e3}.lefttools hr,.properties hr{border-color:#2b4355}
+.lefttools #layers{color:#a8bed0}
+.canvasarea{background:#152b3b;border:0;border-radius:0}
+.canvashead{background:#102333;border-color:#2b4355;color:#a9c0d2}
+.canvashead button{background:#102333;color:#e5edf5;border-color:#355064}
+.stage{background:#f6f7f9;border-color:#cbd5df;box-shadow:0 4px 24px #0004}
+.properties p,.properties label{color:#a9bfd1}
+.properties input{background:#0a1b28;color:#fff;border-color:#355064}
+.layeritem{background:#0b1c29;border-color:#2d4659;color:#cbd9e6;border-radius:4px}
+.layeritem.active{background:#1265d6;border-color:#4a98ff;color:#fff}
+#csvPreview th,#csvPreview td{border-color:#344c5d}
+footer{background:#0c1b27;color:#8ca6bb}
+.filemenu-pop{background:#102333;border-color:#365064}.filemenu-pop button,.filemenu-item{background:#102333;color:#e4edf5}.filemenu-pop button:hover,.filemenu-item:hover{background:#17446b;color:#fff}
+.toast{background:#102c43;border:1px solid #3675a5}
+.startscreen,.importscreen{background:radial-gradient(circle at 80% 10%,#173b58 0,#0b1b28 55%,#08131d 100%);color:#eef5fb}
+.startbrand small{color:#9eb4c8}.eyebrow{color:#73b4ff}
+.welcome h1,.importwelcome h1{color:#fff}.welcome>p,.importwelcome>p{color:#a8bfd2}
+.workflowcard{background:#102333;border-color:#2e4a5e;color:#f3f7fb;box-shadow:0 12px 35px #0003}
+.workflowcard>span:not(.workflowicon){color:#a8bfd2}.workflowcard.featured{background:linear-gradient(145deg,#132f45,#102333);border-color:#287eff}
+.workflowicon{background:#163c5b;color:#78b7ff}
+.startfoot{color:#809bb1}.importwelcome{background:#102333;border-color:#2e4a5e;box-shadow:0 20px 60px #0003}
+@media(max-width:1100px){.workspace{grid-template-columns:125px minmax(260px,1fr)}.properties{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;border-top:1px solid #2b4355}.properties b,.properties p{grid-column:1/-1}}
+@media(max-width:760px){.app{grid-template-columns:1fr}.sidebar{display:none}.workspace{grid-template-columns:1fr}.lefttools{display:none}.properties{display:block}.top{padding:12px}.importbar{flex-wrap:wrap}}
