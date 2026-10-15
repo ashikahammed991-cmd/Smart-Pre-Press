@@ -1,17 +1,15 @@
-# Smart Pre-Press v0.4 — Editor Prototype
+# Smart Pre-Press v0.5 (Workflow-first Editor Prototype)
 
-## এই সংস্করণে
-- Field Mapping পেজ সরিয়ে সরাসরি Template Editor workspace।
-- Template import করলে editor workspace-এ preview/overlay tools পাওয়া যায়।
-- PDF ও SVG preview; AI/EPS ফাইল বাছাই করা যায়, তবে built-in preview-তে নির্ভরযোগ্যভাবে রেন্ডার হয় না। AI/EPS-এর PDF/SVG preview export করে import করুন।
-- Select, Text, Rectangle, Line, Delete tools।
-- Text-এর font family, size, color, bold পরিবর্তন।
-- Undo/Redo buttons এবং Ctrl+Z / Ctrl+Y shortcut।
-- CSV import করে header/প্রথম রেকর্ডের preview।
-- Layout ও Output আলাদা workflow tabs।
+## নতুন UX
+- অ্যাপ খুললে প্রথমে দুটি পছন্দ: **Only Layout** এবং **Layout & Output**।
+- যেকোনো workflow বেছে নেওয়ার পর Template Import স্ক্রিন আসে।
+- Template নির্বাচন করলে Editor Workspace খোলে।
+- Illustrator-inspired layout: বাম পাশে tools/layers, মাঝখানে artboard, ডানে properties, উপরে toolbar এবং Undo/Redo।
+- Undo/Redo buttons এবং Ctrl+Z / Ctrl+Y।
+- CSV import এবং text/shape overlay tools আগের prototype-এর মতোই আছে।
 
-## গুরুত্বপূর্ণ সীমাবদ্ধতা
-এটি এখনো Illustrator-এর পূর্ণ বিকল্প নয়। Original AI/EPS/PDF ফাইলের ভেতরের objects সরাসরি edit হয় না; PDF/SVG-র ওপর editable overlay objects তৈরি হয়। এই prototype-এ project save/open, XLSX parsing, barcode/QR generation, permanent artwork export, Auto UPS, cutting marks, mixed-size plate logic এবং costing এখনো নেই।
+## GitHub-এ আপডেট
+ZIP Extract করে `src/index.html`, `src/app.js`, `src/styles.css`, `package.json` এবং `README_BN.md` আপডেট করো। `main.js` ও `.github/workflows/build-windows.yml` আগের মতো রাখো। Commit করার পর Actions-এ নতুন Build সফল হলে Artifact থেকে Windows installer নামাও।
 
-## Windows build
-Repository-তে `src/index.html`, `src/app.js`, `src/styles.css`, `main.js`, `package.json` এবং `.github/workflows/build-windows.yml` সঠিক path-এ রাখুন। GitHub Actions workflow সফল হলে Artifact থেকে Windows installer ডাউনলোড করুন।
+## সীমাবদ্ধতা
+এটি Illustrator-inspired UI prototype, Adobe Illustrator-এর পূর্ণ বিকল্প নয়। PDF/SVG preview করা যায়; AI/EPS preview, native artwork object editing, production-ready merge/export, Auto UPS, cutting marks ও costing এখনও পরবর্তী ধাপের কাজ।
