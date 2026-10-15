@@ -1,7 +1,7 @@
 {
   "name": "smart-pre-press",
-  "version": "1.2.0",
-  "description": "Smart Pre-Press test prototype: editor overlays, CSV/XLSX merge, project save/load, PDF/SVG preview, basic UPS layout and Windows installer workflow",
+  "version": "1.3.0",
+  "description": "Smart Pre-Press dark workspace UI refresh; PDF/SVG preview, editable overlay prototype, CSV/XLSX merge and basic UPS layout",
   "main": "main.js",
   "author": "Smart Pre-Press",
   "license": "UNLICENSED",
