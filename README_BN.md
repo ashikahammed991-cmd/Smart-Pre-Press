@@ -34,3 +34,9 @@ Installer বানাতে:
 `npm run dist`
 
 **সতর্কতা:** পুরোনো ফাইল replace করার আগে repository-র একটি backup রাখুন।
+
+
+## v1.3 UI refresh
+- রেফারেন্স স্ক্রিনশট অনুসারে ডার্ক নেভি ওয়ার্কস্পেস স্টাইল আপডেট।
+- এটি এখনো প্রোটোটাইপ: PDF/SVG preview এবং overlay object editing; AI/EPS-এর native vector editing নয়।
+- UPS layout বর্তমানে নির্বাচিত editable overlay object কপি করে; imported PDF-এর ভিতরের আসল artwork নির্বাচন/এম্বেড করে না।
