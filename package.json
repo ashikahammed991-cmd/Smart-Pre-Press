@@ -1,30 +1,49 @@
-name: Build Smart Pre-Press Windows Installer
-
-on:
-  workflow_dispatch:
-  push:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
-
-jobs:
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Node.js (cloud runner only)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Install dependencies
-        run: npm install
-      - name: Build Windows installer
-        run: npm run dist
-      - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Smart-PrePress-Windows-Installer
-          path: dist/*.exe
-          if-no-files-found: error
+{
+  "name": "smart-pre-press",
+  "version": "1.2.0",
+  "description": "Smart Pre-Press test prototype: editor overlays, CSV/XLSX merge, project save/load, PDF/SVG preview, basic UPS layout and Windows installer workflow",
+  "main": "main.js",
+  "author": "Smart Pre-Press",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.smartprepress.app",
+    "productName": "Smart Pre-Press",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "jszip": "^3.10.1",
+    "jspdf": "^3.0.1"
+  }
+}
