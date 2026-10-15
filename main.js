@@ -1,30 +1,15 @@
-const { app, BrowserWindow } = require('electron');
-const path = require('path');
+# Smart Pre-Press v0.5 (Workflow-first Editor Prototype)
 
-function createWindow() {
-  const win = new BrowserWindow({
-    width: 1440,
-    height: 920,
-    minWidth: 1050,
-    minHeight: 700,
-    title: 'Smart Pre-Press',
-    backgroundColor: '#f4f7fb',
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  });
-  win.loadFile(path.join(__dirname, 'src', 'index.html'));
-}
+## নতুন UX
+- অ্যাপ খুললে প্রথমে দুটি পছন্দ: **Only Layout** এবং **Layout & Output**।
+- যেকোনো workflow বেছে নেওয়ার পর Template Import স্ক্রিন আসে।
+- Template নির্বাচন করলে Editor Workspace খোলে।
+- Illustrator-inspired layout: বাম পাশে tools/layers, মাঝখানে artboard, ডানে properties, উপরে toolbar এবং Undo/Redo।
+- Undo/Redo buttons এবং Ctrl+Z / Ctrl+Y।
+- CSV import এবং text/shape overlay tools আগের prototype-এর মতোই আছে।
 
-app.whenReady().then(() => {
-  createWindow();
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
+## GitHub-এ আপডেট
+ZIP Extract করে `src/index.html`, `src/app.js`, `src/styles.css`, `package.json` এবং `README_BN.md` আপডেট করো। `main.js` ও `.github/workflows/build-windows.yml` আগের মতো রাখো। Commit করার পর Actions-এ নতুন Build সফল হলে Artifact থেকে Windows installer নামাও।
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+## সীমাবদ্ধতা
+এটি Illustrator-inspired UI prototype, Adobe Illustrator-এর পূর্ণ বিকল্প নয়। PDF/SVG preview করা যায়; AI/EPS preview, native artwork object editing, production-ready merge/export, Auto UPS, cutting marks ও costing এখনও পরবর্তী ধাপের কাজ।
