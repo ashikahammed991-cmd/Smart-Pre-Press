@@ -1,7 +1,7 @@
 {
   "name": "smart-pre-press",
-  "version": "0.5.0",
-  "description": "Smart Pre-Press workflow-first Illustrator-style editor with undo and redo",
+  "version": "0.6.0",
+  "description": "Smart Pre-Press workflow editor with CSV/XLSX data merge and field binding",
   "main": "main.js",
   "author": "Smart Pre-Press",
   "license": "UNLICENSED",
@@ -40,5 +40,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     }
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
   }
 }
