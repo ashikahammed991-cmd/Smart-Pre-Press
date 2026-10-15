@@ -155,3 +155,111 @@ $('mappingSave').addEventListener('click', () => {
 $('layoutBack').addEventListener('click', () => showSection('mapping'));
 $('outputBack').addEventListener('click', () => showSection('layout'));
 showSection('workspace');
+
+// v0.3: template preview + manual on-artwork field placement.
+let templateObjectUrl = null;
+let placedFields = [];
+let selectedPlacedId = null;
+let nextPlacedId = 1;
+function fieldOptions() {
+  const sel = $('placeField'); if (!sel) return;
+  const current = sel.value;
+  sel.replaceChildren();
+  const opts = [
+    ['SKU', 'SKU / Item Code'], ['Size', 'Size'], ['Price', 'Price'],
+    ['Barcode', 'Barcode value'], ['QR', 'QR value'],
+    ...customFields.map((f, i) => [`custom_${i}`, f])
+  ];
+  opts.forEach(([value, label]) => { const o = document.createElement('option'); o.value = value; o.textContent = label; sel.appendChild(o); });
+  if (opts.some(o => o[0] === current)) sel.value = current;
+}
+function fieldLabel(key) {
+  if (key === 'SKU') return 'SKU / Item Code';
+  if (key === 'Size') return 'Size';
+  if (key === 'Price') return 'Price';
+  if (key === 'Barcode') return 'Barcode';
+  if (key === 'QR') return 'QR Code';
+  if (key.startsWith('custom_')) return customFields[Number(key.split('_')[1])] || 'Custom field';
+  return key;
+}
+function sampleValue(key) {
+  const rec = dataRecord(1);
+  const column = mappings[key] || '';
+  return column ? String(rec[column] ?? '') : `{{${fieldLabel(key)}}}`;
+}
+function setTemplatePreview(file) {
+  const stage = $('templateStage'), pdf = $('pdfPreview'), svg = $('svgPreview');
+  const placeholder = stage.querySelector('.stage-placeholder');
+  if (templateObjectUrl) URL.revokeObjectURL(templateObjectUrl);
+  templateObjectUrl = URL.createObjectURL(file);
+  pdf.hidden = true; svg.hidden = true; pdf.removeAttribute('src'); svg.removeAttribute('src');
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'pdf') {
+    pdf.src = templateObjectUrl; pdf.hidden = false; placeholder.hidden = true;
+    $('templateStatus').className = 'template-status';
+    $('templateStatus').textContent = `PDF preview loaded: ${file.name}. Click the visible artwork to place fields.`;
+  } else if (ext === 'svg') {
+    svg.src = templateObjectUrl; svg.hidden = false; placeholder.hidden = true;
+    $('templateStatus').className = 'template-status';
+    $('templateStatus').textContent = `SVG preview loaded: ${file.name}. Click the artwork to place fields.`;
+  } else {
+    placeholder.hidden = false;
+    placeholder.innerHTML = `Artwork selected: <strong>${file.name.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</strong><br><small>Browser preview is not available for this format. Export a PDF/SVG preview for accurate placement; the original file remains unchanged.</small>`;
+    $('templateStatus').className = 'template-status warning';
+    $('templateStatus').textContent = `${ext.toUpperCase()} file selected. It is not converted or modified; use a PDF/SVG preview to see the artwork under the field overlay.`;
+  }
+  renderPlacedFields();
+}
+function currentStyle() {
+  return { fontFamily: $('fontFamily').value, fontSize: Math.max(4, Number($('fontSize').value) || 10), color: $('fontColor').value, bold: $('fontBold').checked };
+}
+function renderPlacedFields() {
+  const layer = $('placementLayer'); if (!layer) return;
+  layer.replaceChildren();
+  placedFields.forEach(f => {
+    const el = document.createElement('div'); el.className = 'placed-text' + (f.id === selectedPlacedId ? ' active' : '');
+    el.textContent = sampleValue(f.key) || '(empty value)';
+    el.style.left = `${f.x * 100}%`; el.style.top = `${f.y * 100}%`;
+    el.style.fontFamily = f.style.fontFamily; el.style.fontSize = `${f.style.fontSize}pt`;
+    el.style.color = f.style.color; el.style.fontWeight = f.style.bold ? '700' : '400';
+    el.title = `${fieldLabel(f.key)} — click to select`;
+    el.addEventListener('click', e => { e.stopPropagation(); selectedPlacedId = f.id; renderPlacedFields(); renderPlacedList(); });
+    layer.appendChild(el);
+  });
+  renderPlacedList();
+}
+function renderPlacedList() {
+  const list = $('placedList'); if (!list) return;
+  list.replaceChildren();
+  $('placedCount').textContent = `${placedFields.length} field${placedFields.length === 1 ? '' : 's'}`;
+  if (!placedFields.length) { list.textContent = 'No fields placed yet. Choose a field above, then click on the template.'; return; }
+  placedFields.forEach(f => {
+    const b = document.createElement('button'); b.className = 'placed-item' + (f.id === selectedPlacedId ? ' active' : '');
+    b.textContent = `${fieldLabel(f.key)} · ${Math.round(f.x * 100)}%, ${Math.round(f.y * 100)}%`;
+    b.addEventListener('click', () => { selectedPlacedId = f.id; renderPlacedFields(); }); list.appendChild(b);
+  });
+}
+const placementLayer = $('placementLayer');
+if (placementLayer) placementLayer.addEventListener('click', e => {
+  if (e.target !== placementLayer) return;
+  const r = placementLayer.getBoundingClientRect();
+  const field = { id: nextPlacedId++, key: $('placeField').value, x: Math.min(0.98, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(0.98, Math.max(0, (e.clientY - r.top) / r.height)), style: currentStyle() };
+  placedFields.push(field); selectedPlacedId = field.id; renderPlacedFields();
+  toast(`${fieldLabel(field.key)} placed. Click a field to select it.`);
+});
+['fontFamily', 'fontSize', 'fontColor', 'fontBold'].forEach(id => $(id)?.addEventListener('change', () => {
+  if (!selectedPlacedId) return;
+  const f = placedFields.find(x => x.id === selectedPlacedId); if (f) f.style = currentStyle(); renderPlacedFields();
+}));
+$('removePlaced')?.addEventListener('click', () => {
+  if (!selectedPlacedId) { toast('Select a placed field first.'); return; }
+  placedFields = placedFields.filter(f => f.id !== selectedPlacedId); selectedPlacedId = null; renderPlacedFields(); toast('Selected field removed.');
+});
+// Keep field chooser in sync with custom fields and data mappings.
+const originalRenderMapping = renderMapping;
+renderMapping = function() { originalRenderMapping(); fieldOptions(); renderPlacedFields(); };
+const originalUpdateMergePreview = updateMergePreview;
+updateMergePreview = function() { originalUpdateMergePreview(); renderPlacedFields(); };
+// Extend the existing artwork selection handler without changing its file-selection flow.
+artFile.addEventListener('change', () => { const file = artFile.files[0]; if (file) setTemplatePreview(file); });
+fieldOptions();
