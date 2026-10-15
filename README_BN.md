@@ -1,29 +1,18 @@
-# Smart Pre-Press — Version 0.2 (Field Mapping Prototype)
+# Smart Pre-Press v0.3 — Template Preview & Manual Field Placement
 
-এটি Smart Pre-Press Windows desktop app-এর পরবর্তী prototype। Electron app GitHub Actions-এর Windows runner দিয়ে build করা যায়; নিজের কম্পিউটারে Node.js ইনস্টল করা বাধ্যতামূলক নয়।
+## এই আপডেটে
+- CSV import এবং column mapping আগের মতো আছে।
+- PDF template preview দেখানোর চেষ্টা করে; SVG preview-ও সমর্থিত।
+- Mapping পেজে template-এর ওপর ক্লিক করে SKU, Size, Price, Barcode, QR বা custom field বসানো যায়।
+- প্রতিটি placed field-এর font family, font size, color ও bold সেট করা যায়।
+- Field নির্বাচন করে Remove selected দিয়ে মুছে ফেলা যায়।
+- Original AI/EPS/PDF artwork ফাইল পরিবর্তন করা হয় না।
 
-## এই সংস্করণে কাজ করে
-- Master Tag ফাইল নির্বাচন (AI/EPS/PDF) — ফাইলটি নির্বাচন/নাম দেখায়; artwork-এর ভিতরের live editing এখনো যুক্ত নয়।
-- CSV ফাইল import ও প্রথম কয়েকটি রেকর্ডের preview।
-- CSV column থেকে SKU, Size, Price, Barcode value, QR value এবং custom text field mapping নির্বাচন।
-- প্রথম data record থেকে mapped value preview।
-- Only Layout / Layout & Output workflow নির্বাচন।
-- Windows NSIS installer build (GitHub Actions artifact)।
-
-## এখনো তৈরি হয়নি
-- XLSX/XLS সরাসরি পড়া (Excel থেকে CSV UTF-8 হিসেবে Save As করে import করুন)।
-- AI/EPS/PDF artwork-এর ভিতরে mapped text বসানো বা design editing।
-- বাস্তব barcode/QR image generation।
-- Auto UPS, mixed-size sheet layout, cutting marks, production export ও costing।
+## গুরুত্বপূর্ণ সীমাবদ্ধতা
+- Chromium/Electron ব্রাউজারে AI/EPS ফাইল নির্ভরযোগ্যভাবে preview করা যায় না। সঠিক artwork-এর ওপর field বসাতে Illustrator থেকে একই design-এর PDF বা SVG preview export করে সেটি নির্বাচন করুন।
+- PDF preview-এর ওপর overlay অবস্থান prototype পর্যায়ের; PDF viewer-এর zoom/scroll বদলালে overlay alignment বদলাতে পারে।
+- এই build এখনো placed fields-কে মূল AI/EPS/PDF-এর মধ্যে embed করে না এবং final production PDF/AI export করে না।
+- XLSX parsing, barcode/QR graphic generation, Auto UPS, cutting marks, costing ও production export পরবর্তী ধাপ।
 
 ## GitHub-এ আপডেট
-ZIP-এর ভিতরের path অক্ষুণ্ণ রেখে প্রয়োজনীয় ফাইলগুলো repository-তে upload/replace করুন:
-- `src/index.html`
-- `src/app.js`
-- `src/styles.css`
-- `package.json`
-
-`main.js` এবং `.github/workflows/build-windows.yml` অপরিবর্তিত রাখা যাবে। `package.json`-এ `--publish never` আছে, তাই build-এর সময় GitHub Release token দরকার হবে না।
-
-## Windows installer তৈরি
-GitHub repository → Actions → Build Smart Pre-Press Windows Installer। সফল run হলে run page-এর Artifacts অংশ থেকে `Smart-PrePress-Windows-Installer` ZIP ডাউনলোড করুন; ZIP extract করে ভিতরের `.exe` চালান।
+Repository-র root-এর `main.js`, `package.json` অপরিবর্তিত রাখুন। এই ZIP থেকে `src/index.html`, `src/app.js`, `src/styles.css` এবং `README_BN.md` প্রতিস্থাপন করুন। এরপর Commit changes করুন, Actions-এ সবুজ টিক আসলে Artifact ডাউনলোড করুন।
