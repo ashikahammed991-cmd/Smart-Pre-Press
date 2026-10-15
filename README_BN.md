@@ -1,18 +1,17 @@
-# Smart Pre-Press v0.3 — Template Preview & Manual Field Placement
+# Smart Pre-Press v0.4 — Editor Prototype
 
-## এই আপডেটে
-- CSV import এবং column mapping আগের মতো আছে।
-- PDF template preview দেখানোর চেষ্টা করে; SVG preview-ও সমর্থিত।
-- Mapping পেজে template-এর ওপর ক্লিক করে SKU, Size, Price, Barcode, QR বা custom field বসানো যায়।
-- প্রতিটি placed field-এর font family, font size, color ও bold সেট করা যায়।
-- Field নির্বাচন করে Remove selected দিয়ে মুছে ফেলা যায়।
-- Original AI/EPS/PDF artwork ফাইল পরিবর্তন করা হয় না।
+## এই সংস্করণে
+- Field Mapping পেজ সরিয়ে সরাসরি Template Editor workspace।
+- Template import করলে editor workspace-এ preview/overlay tools পাওয়া যায়।
+- PDF ও SVG preview; AI/EPS ফাইল বাছাই করা যায়, তবে built-in preview-তে নির্ভরযোগ্যভাবে রেন্ডার হয় না। AI/EPS-এর PDF/SVG preview export করে import করুন।
+- Select, Text, Rectangle, Line, Delete tools।
+- Text-এর font family, size, color, bold পরিবর্তন।
+- Undo/Redo buttons এবং Ctrl+Z / Ctrl+Y shortcut।
+- CSV import করে header/প্রথম রেকর্ডের preview।
+- Layout ও Output আলাদা workflow tabs।
 
 ## গুরুত্বপূর্ণ সীমাবদ্ধতা
-- Chromium/Electron ব্রাউজারে AI/EPS ফাইল নির্ভরযোগ্যভাবে preview করা যায় না। সঠিক artwork-এর ওপর field বসাতে Illustrator থেকে একই design-এর PDF বা SVG preview export করে সেটি নির্বাচন করুন।
-- PDF preview-এর ওপর overlay অবস্থান prototype পর্যায়ের; PDF viewer-এর zoom/scroll বদলালে overlay alignment বদলাতে পারে।
-- এই build এখনো placed fields-কে মূল AI/EPS/PDF-এর মধ্যে embed করে না এবং final production PDF/AI export করে না।
-- XLSX parsing, barcode/QR graphic generation, Auto UPS, cutting marks, costing ও production export পরবর্তী ধাপ।
+এটি এখনো Illustrator-এর পূর্ণ বিকল্প নয়। Original AI/EPS/PDF ফাইলের ভেতরের objects সরাসরি edit হয় না; PDF/SVG-র ওপর editable overlay objects তৈরি হয়। এই prototype-এ project save/open, XLSX parsing, barcode/QR generation, permanent artwork export, Auto UPS, cutting marks, mixed-size plate logic এবং costing এখনো নেই।
 
-## GitHub-এ আপডেট
-Repository-র root-এর `main.js`, `package.json` অপরিবর্তিত রাখুন। এই ZIP থেকে `src/index.html`, `src/app.js`, `src/styles.css` এবং `README_BN.md` প্রতিস্থাপন করুন। এরপর Commit changes করুন, Actions-এ সবুজ টিক আসলে Artifact ডাউনলোড করুন।
+## Windows build
+Repository-তে `src/index.html`, `src/app.js`, `src/styles.css`, `main.js`, `package.json` এবং `.github/workflows/build-windows.yml` সঠিক path-এ রাখুন। GitHub Actions workflow সফল হলে Artifact থেকে Windows installer ডাউনলোড করুন।
