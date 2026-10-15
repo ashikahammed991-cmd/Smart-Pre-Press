@@ -1,24 +1,36 @@
-# Smart Pre-Press v1.0 — File মেনু, PDF ও Project Save
+# Smart Pre-Press — Windows Test Build (Source ZIP)
 
-## নতুন সুবিধা
-- সব Save/Open কাজ এখন **File** মেনুর ভিতরে।
-- **Save Current as PDF** বর্তমান রেকর্ডকে সাধারণ PDF ফাইলে সেভ করে।
-- **Save All Records as PDF** সব রেকর্ডকে একাধিক পৃষ্ঠার একটি PDF ফাইলে সেভ করে।
-- **Save Project (.spp)** সফটওয়্যারের নিজস্ব ফরম্যাটে কাজ সেভ করে; **Open Project** দিয়ে পরে আবার খোলা যায়।
-- আগের Only Layout / Layout & Output, Editor, CSV/XLSX Import, Data Binding এবং Undo/Redo রাখা হয়েছে।
+এই ZIP-এ GitHub Actions দিয়ে Windows installer (`.exe`) বানানোর জন্য প্রয়োজনীয় Electron source code ও workflow আছে। এটি **পরীক্ষামূলক build**, production-certified সম্পূর্ণ pre-press suite নয়।
 
-## GitHub-এ আপডেট
-1. ZIP Extract করো।
-2. Repository-তে `src/index.html`, `src/app.js`, `src/styles.css` এবং `package.json` একই path-এ আপডেট করো। `main.js` ও `.github/workflows/build-windows.yml` আগের মতো রাখো।
-3. Commit করে **Actions** ট্যাবে Build সফল হওয়া পর্যন্ত অপেক্ষা করো। তারপর Windows installer artifact ডাউনলোড করো।
+## এই build-এ যা আছে
+- Only Layout / Layout & Output workflow selection
+- Editor workspace ও PDF/SVG preview
+- Text/rectangle/line overlay object যোগ, select, move/resize, duplicate, delete
+- Undo/Redo
+- CSV/XLSX data import এবং text field binding / record preview
+- Basic UPS layout ও cutting-mark overlay
+- Project `.spp` save/open
+- Standard PDF export options
+- GitHub Actions workflow দিয়ে Windows installer build
 
 ## গুরুত্বপূর্ণ সীমাবদ্ধতা
-- Export করা PDF একটি সাধারণ PDF; Adobe Acrobat-এর নিজস্ব/বিশেষ ফরম্যাট নয়। সাধারণ PDF viewer-এ খোলার জন্য তৈরি।
-- এই পর্যায়ে PDF-তে Editor-এর overlay text/shape এবং merged text থাকে; Import করা মূল AI/EPS/PDF artwork এখনো PDF-তে একসঙ্গে বসানো হয় না।
-- মূল artwork অক্ষত রেখে PDF composition, AI/EPS rendering, Auto UPS, Cutting Marks, Barcode/QR ও চূড়ান্ত production output পরবর্তী ধাপে করতে হবে।
+- AI/EPS ফাইলের native vector/text content-কে Illustrator-এর মতো সরাসরি edit করার পূর্ণ engine এতে নেই। PDF/SVG preview ও overlay editing-ই এই prototype-এর বর্তমান সীমা।
+- UPS/cutting marks ও PDF export-কে production artwork-এ ব্যবহারের আগে sample file দিয়ে যাচাই করতে হবে।
+- তাই এই ZIP-কে final production-ready software হিসেবে ধরে নেওয়া যাবে না; আগে test build চালিয়ে ফল যাচাই করুন।
 
-## পরবর্তী কাজ
-১. মূল artwork-কে PDF-এর background হিসেবে রেখে merged text/shape বসানো।
-২. AI/EPS ফাইলের নিরাপদ preview pipeline।
-৩. Auto UPS, spacing, mixed-size layout, cutting marks ও multi-plate output।
-৪. Barcode/QR generation এবং output validation।
+## GitHub-এ যোগ করার নিয়ম
+1. ZIP extract করুন।
+2. Extract করা project folder-এর **ভেতরের সব ফাইল ও folder** আপনার `Smart-Pre-Press` GitHub repository-র root-এ upload/replace করুন।
+3. `.github/workflows/build-windows.yml` ফাইলটি আছে কি না নিশ্চিত করুন।
+4. GitHub → **Actions** → **Build Smart Pre-Press Windows Installer** → **Run workflow** চাপুন (অথবা `main` branch-এ commit/push হলে workflow চলবে)।
+5. সফল হলে workflow run-এর নিচে **Artifacts** থেকে `Smart-PrePress-Windows-Installer` ZIP ডাউনলোড করুন; তার ভেতরে `.exe` থাকবে।
+
+## স্থানীয়ভাবে চালানো (ঐচ্ছিক)
+Node.js 22 ইনস্টল করা কম্পিউটারে project folder খুলে terminal-এ চালান:
+`npm install`
+`npm start`
+
+Installer বানাতে:
+`npm run dist`
+
+**সতর্কতা:** পুরোনো ফাইল replace করার আগে repository-র একটি backup রাখুন।
