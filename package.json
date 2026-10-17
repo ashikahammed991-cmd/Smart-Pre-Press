@@ -1,7 +1,7 @@
 {
   "name": "smart-pre-press",
-  "version": "1.3.0",
-  "description": "Smart Pre-Press dark workspace UI refresh; PDF/SVG preview, editable overlay prototype, CSV/XLSX merge and basic UPS layout",
+  "version": "1.4.0",
+  "description": "Smart Pre-Press editable artboard prototype with artboard management, editable overlay objects, CSV/XLSX merge and basic UPS layout",
   "main": "main.js",
   "author": "Smart Pre-Press",
   "license": "UNLICENSED",
