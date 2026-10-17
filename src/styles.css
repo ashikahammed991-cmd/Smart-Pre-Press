@@ -66,3 +66,14 @@ footer{background:#0c1b27;color:#8ca6bb}
 .startfoot{color:#809bb1}.importwelcome{background:#102333;border-color:#2e4a5e;box-shadow:0 20px 60px #0003}
 @media(max-width:1100px){.workspace{grid-template-columns:125px minmax(260px,1fr)}.properties{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;border-top:1px solid #2b4355}.properties b,.properties p{grid-column:1/-1}}
 @media(max-width:760px){.app{grid-template-columns:1fr}.sidebar{display:none}.workspace{grid-template-columns:1fr}.lefttools{display:none}.properties{display:block}.top{padding:12px}.importbar{flex-wrap:wrap}}
+
+/* v1.4 native editable artboard workspace */
+.stage{display:flex;align-items:flex-start;justify-content:center;background:#152b3b;padding:28px;min-height:640px;overflow:auto}
+.artboard{position:relative;flex:0 0 auto;width:800px;height:600px;background:#fff;color:#111;box-shadow:0 4px 18px #0005;border:1px solid #c8d0d8;overflow:visible;transform-origin:top left}
+.artboard-label{position:absolute;left:0;top:-22px;color:#a9c0d2;font-size:11px;white-space:nowrap}
+.artboard #objects{position:absolute;inset:0;pointer-events:none}
+.artboard #svgArtwork{position:absolute;inset:0;pointer-events:none;color:#667788;padding:18px;font-size:12px}
+.artboard .import-note{border:1px dashed #9aaabd;padding:12px;background:#f6f8fb;color:#53657a}
+.artsize{display:flex;align-items:center;gap:4px;font-size:11px;color:#a9c0d2}
+.artsize input{width:68px;padding:5px;background:#0a1b28;color:#fff;border:1px solid #355064;border-radius:4px}
+.viewcontrols select{max-width:120px;background:#102333;color:#e5edf5;border:1px solid #355064;border-radius:4px;padding:6px}
