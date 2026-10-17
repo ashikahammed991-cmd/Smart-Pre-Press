@@ -77,3 +77,5 @@ footer{background:#0c1b27;color:#8ca6bb}
 .artsize{display:flex;align-items:center;gap:4px;font-size:11px;color:#a9c0d2}
 .artsize input{width:68px;padding:5px;background:#0a1b28;color:#fff;border:1px solid #355064;border-radius:4px}
 .viewcontrols select{max-width:120px;background:#102333;color:#e5edf5;border:1px solid #355064;border-radius:4px;padding:6px}
+
+#pdfArtwork{position:absolute;left:0;top:0;z-index:0;overflow:hidden;background:#fff;pointer-events:none}#pdfArtwork canvas{max-width:none;max-height:none}.artboard #objects{z-index:2}
