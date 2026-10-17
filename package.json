@@ -44,6 +44,7 @@
   "dependencies": {
     "xlsx": "^0.18.5",
     "jszip": "^3.10.1",
-    "jspdf": "^3.0.1"
+    "jspdf": "^3.0.1",
+    "pdfjs-dist": "3.11.174"
   }
 }
