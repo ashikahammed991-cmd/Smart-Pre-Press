@@ -1,7 +1,7 @@
 {
   "name": "smart-pre-press",
-  "version": "1.4.0",
-  "description": "Smart Pre-Press editable artboard prototype with artboard management, editable overlay objects, CSV/XLSX merge and basic UPS layout",
+  "version": "2.0.0",
+  "description": "Smart Pre-Press AI/EPS/PDF artwork preview with editable vector shapes, artboards, and CSV/XLSX merge, CSV/XLSX merge and basic UPS layout",
   "main": "main.js",
   "author": "Smart Pre-Press",
   "license": "UNLICENSED",
