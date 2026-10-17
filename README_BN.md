@@ -1,19 +1,32 @@
-# Smart Pre-Press — Source Project
+# Smart Pre-Press v1.8 — AI / EPS / PDF Import Foundation
 
-## Windows installer তৈরি
-1. GitHub repository-তে এই ZIP-এর source files upload/replace করো।
-2. `.github/workflows/build-windows.yml` workflow চালাও (অথবা source push করলে workflow automatic চালু হলে অপেক্ষা করো)।
-3. GitHub-এর **Actions** → successful run → **Artifacts** থেকে Windows build download করো।
+এই সংস্করণে SVG workflow বাদ দিয়ে AI, EPS ও PDF ফাইলকে অগ্রাধিকার দেওয়া হয়েছে।
 
-## এই সংস্করণে
-- PDF-এর প্রথম পৃষ্ঠা visual reference হিসেবে import/render করা যায় (PDF.js)।
-- PDF-compatible AI ফাইল হলে সেটিও preview হতে পারে।
-- SVG artwork visual reference হিসেবে artboard-এ দেখায়।
-- imported artwork-এর উপরে যোগ করা text/shape overlay আলাদাভাবে edit করা যায়।
-- CSV/XLSX data merge এবং artboard/overlay tools আগের মতো রয়েছে।
+## বর্তমান সক্ষমতা
+- PDF ফাইলের প্রথম পৃষ্ঠা visual reference হিসেবে render করা।
+- PDF-compatible AI ফাইল preview করার চেষ্টা করা।
+- EPS ফাইল নির্বাচন করা যায়; এই সংস্করণে EPS সরাসরি render হয় না। EPS preview-এর জন্য Illustrator থেকে PDF export করে import করতে হবে।
+- Artboard-এর ওপর আলাদা editable overlay text/shape যোগ করা, সরানো ও পরিবর্তন করা যায়।
+- CSV/XLSX data merge prototype, project save/open এবং basic overlay PDF export।
 
 ## গুরুত্বপূর্ণ সীমাবদ্ধতা
-- PDF/SVG/AI-এর original artwork এখনো আলাদা আলাদা native editable object-এ convert হয় না; original artwork visual reference, আর নতুন overlay objects edit করা যায়।
-- EPS সরাসরি preview হয় না। Illustrator-এ EPS খুলে PDF হিসেবে export করে PDF import করো।
-- PDF export এখনো imported original artwork-সহ final print PDF তৈরি করে না; overlay objects export করে।
-- এই source-এ Electron build-এর জন্য GitHub Actions-এ dependencies install করতে হবে।
+এটি এখনো Adobe Illustrator-এর মতো native vector editor নয়। Imported PDF/AI ফাইলের সব original paths, anchor points, layers, text, gradients বা groups আলাদা করে edit করা যায় না। Exported PDF-তে imported original artwork এখনো embedded হয় না; overlay objects export হয়। EPS direct rendering-ও এখনো নেই।
+
+## Windows installer build
+GitHub Actions workflow `Build Smart Pre-Press Windows Installer` চালাও। Build সফল হলে `dist/*.exe` artifact download করো।
+
+এই সোর্সে JavaScript syntax পরীক্ষা করা হয়েছে; Windows installer বাস্তবে চালিয়ে পরীক্ষা করা হয়নি।
+
+
+## v1.9 আপডেট
+- PDF-compatible PDF/AI থেকে পাওয়া প্রথম পৃষ্ঠার ভিজ্যুয়াল প্রিভিউ এখন Save Current as PDF এবং Save All Records as PDF-এ ব্যাকগ্রাউন্ড হিসেবে যোগ হয়।
+- PDF export আর্টবোর্ডের নির্ধারিত width/height ব্যবহার করে; overlay টেক্সট/শেপ তার ওপর বসে।
+- `.spp` প্রজেক্টে artwork preview-ও সংরক্ষিত হয়, ফলে প্রজেক্ট পুনরায় খুললে প্রিভিউ ফিরে আসতে পারে।
+- সীমাবদ্ধতা: ব্যাকগ্রাউন্ডটি raster preview, মূল PDF vector objects নয়। AI কেবল PDF-compatible হলে; EPS-এর জন্য এখনও PDF conversion দরকার।
+
+
+## v2.0 আপডেট
+- Rectangle, Ellipse, Line ও Text অবজেক্ট তৈরি/এডিট করা যায়।
+- Shape-এর Stroke এবং Fill রং বেছে নেওয়া যায়।
+- SVG/PDF export-এ ellipse shape সমর্থন যোগ হয়েছে।
+- সীমাবদ্ধতা: AI/EPS/PDF-এর মূল ফাইলের সব ভেক্টর অবজেক্ট এখনো সরাসরি এডিটযোগ্য নয়; PDF/AI প্রিভিউ আলাদা রেফারেন্স লেয়ার। EPS প্রিভিউয়ের জন্য PDF conversion প্রয়োজন।
