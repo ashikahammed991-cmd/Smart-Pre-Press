@@ -1,3 +1,5 @@
+import type { Cmyk } from "./color";
+
 export interface Pt {
   x: number;
   y: number;
@@ -7,6 +9,9 @@ export interface Style {
   fill: string;
   stroke: string;
   strokeWidth: number;
+  /** When set, the exact print colour; `fill` / `stroke` then hold the screen preview. */
+  fillCmyk?: Cmyk;
+  strokeCmyk?: Cmyk;
 }
 
 /** A bezier anchor. `inH` / `outH` are handle offsets relative to `p`. */
@@ -52,12 +57,19 @@ export interface PathShape extends Base {
 export type Shape = RectShape | EllipseShape | LineShape | PathShape;
 
 export interface Doc {
+  /** Trim size in px (1 px = 1/96 inch). */
   width: number;
   height: number;
+  /** Bleed on every side, in px. */
+  bleed?: number;
+  /** Add crop marks to the PDF export. */
+  cropMarks?: boolean;
   shapes: Shape[]; // painted in array order (last = on top)
 }
 
-export const ARTBOARD = { width: 1000, height: 700 };
+export const MM_TO_PX = 96 / 25.4;
+export const mmToPx = (mm: number) => mm * MM_TO_PX;
+export const pxToMm = (px: number) => px / MM_TO_PX;
 
 let counter = 0;
 export function newId(): string {
@@ -65,8 +77,9 @@ export function newId(): string {
   return `s${Date.now().toString(36)}${counter}`;
 }
 
+/** A new A4 portrait document with 3 mm bleed. */
 export function newDoc(): Doc {
-  return { width: ARTBOARD.width, height: ARTBOARD.height, shapes: [] };
+  return { width: mmToPx(210), height: mmToPx(297), bleed: mmToPx(3), cropMarks: false, shapes: [] };
 }
 
 export function pathData(nodes: Node[], closed: boolean): string {

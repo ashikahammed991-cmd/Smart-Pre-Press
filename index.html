@@ -13,6 +13,7 @@
           <button id="btn-open" title="Open project (Ctrl+O)">Open</button>
           <button id="btn-save" title="Save project (Ctrl+S)">Save</button>
           <button id="btn-export" title="Export SVG (Ctrl+E)">Export SVG</button>
+          <button id="btn-pdf" class="primary" title="Export print PDF (Ctrl+P)">Export PDF</button>
         </div>
         <div class="group">
           <button id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
@@ -39,18 +40,53 @@
       </aside>
 
       <main id="stage-wrap">
-        <svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="-100 -100 1200 900" preserveAspectRatio="xMidYMid meet"></svg>
+        <svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
       </main>
 
-      <aside id="layers">
-        <h3>Layers</h3>
-        <div class="layer-actions">
-          <button id="btn-forward" title="Bring forward">Forward</button>
-          <button id="btn-backward" title="Send backward">Backward</button>
-          <button id="btn-duplicate" title="Duplicate (Ctrl+D)">Duplicate</button>
-          <button id="btn-delete" title="Delete (Del)">Delete</button>
-        </div>
-        <ul id="layer-list"></ul>
+      <aside id="side">
+        <section>
+          <h3>Document</h3>
+          <label class="row">Size
+            <select id="preset">
+              <option value="210x297">A4</option>
+              <option value="148x210">A5</option>
+              <option value="297x420">A3</option>
+              <option value="215.9x279.4">Letter</option>
+              <option value="90x55">Business card</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <div class="row2">
+            <label>W <input type="number" id="doc-w" min="1" step="0.1" /> mm</label>
+            <label>H <input type="number" id="doc-h" min="1" step="0.1" /> mm</label>
+          </div>
+          <div class="row2">
+            <label>Bleed <input type="number" id="doc-bleed" min="0" step="0.5" /> mm</label>
+          </div>
+          <label class="check"><input type="checkbox" id="doc-marks" /> Crop marks in PDF</label>
+        </section>
+
+        <section>
+          <h3>Colour (CMYK %)</h3>
+          <div class="cmyk-row"><span>Fill</span>
+            <input type="number" id="fc" min="0" max="100" title="Cyan" /><input type="number" id="fm" min="0" max="100" title="Magenta" /><input type="number" id="fy" min="0" max="100" title="Yellow" /><input type="number" id="fk" min="0" max="100" title="Black" />
+          </div>
+          <div class="cmyk-row"><span>Stroke</span>
+            <input type="number" id="sc" min="0" max="100" title="Cyan" /><input type="number" id="sm" min="0" max="100" title="Magenta" /><input type="number" id="sy" min="0" max="100" title="Yellow" /><input type="number" id="sk" min="0" max="100" title="Black" />
+          </div>
+          <div class="cmyk-legend"><span>C</span><span>M</span><span>Y</span><span>K</span></div>
+        </section>
+
+        <section id="layers">
+          <h3>Layers</h3>
+          <div class="layer-actions">
+            <button id="btn-forward" title="Bring forward">Forward</button>
+            <button id="btn-backward" title="Send backward">Backward</button>
+            <button id="btn-duplicate" title="Duplicate (Ctrl+D)">Duplicate</button>
+            <button id="btn-delete" title="Delete (Del)">Delete</button>
+          </div>
+          <ul id="layer-list"></ul>
+        </section>
       </aside>
 
       <footer id="statusbar"><span id="status">Ready</span></footer>

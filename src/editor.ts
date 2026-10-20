@@ -1,5 +1,4 @@
 import {
-  ARTBOARD,
   Doc,
   Node,
   PathShape,
@@ -74,7 +73,7 @@ export class Editor {
   private clip: Shape[] = [];
   private spaceDown = false;
 
-  private readonly baseView: Box = { x: -100, y: -100, w: 1200, h: 900 };
+  private baseView: Box = this.fitBox();
   private view: Box = { ...this.baseView };
 
   constructor(private svg: SVGSVGElement) {
@@ -96,6 +95,21 @@ export class Editor {
   }
 
   // ---------- view (zoom / pan) ----------
+
+  /** View that shows the whole page with a little margin. */
+  private fitBox(): Box {
+    const m = 0.08 * Math.max(this.doc.width, this.doc.height);
+    return { x: -m, y: -m, w: this.doc.width + 2 * m, h: this.doc.height + 2 * m };
+  }
+
+  /** Re-fit the view if the page size changed (after undo, open, or a size edit). */
+  private syncBase(): void {
+    const f = this.fitBox();
+    if (f.w !== this.baseView.w || f.h !== this.baseView.h) {
+      this.baseView = f;
+      this.view = { ...f };
+    }
+  }
 
   zoomPercent(): number {
     return Math.round((this.baseView.w / this.view.w) * 100);
@@ -260,6 +274,18 @@ export class Editor {
     this.pushUndo();
     this.doc = doc;
     this.selectedIds = [];
+    this.syncBase();
+    this.render();
+  }
+
+  /** Change page size (px), bleed (px) or crop marks. */
+  setDocument(patch: { width?: number; height?: number; bleed?: number; cropMarks?: boolean }): void {
+    this.pushUndo();
+    if (patch.width && patch.width > 0) this.doc.width = patch.width;
+    if (patch.height && patch.height > 0) this.doc.height = patch.height;
+    if (patch.bleed !== undefined && patch.bleed >= 0) this.doc.bleed = patch.bleed;
+    if (patch.cropMarks !== undefined) this.doc.cropMarks = patch.cropMarks;
+    this.syncBase();
     this.render();
   }
 
@@ -276,7 +302,11 @@ export class Editor {
     if (data?.app !== "smart-pre-press" || !data.doc || !Array.isArray(data.doc.shapes)) {
       throw new Error("This is not a Smart Pre-Press project file");
     }
-    return data.doc as Doc;
+    const d = data.doc as Doc;
+    d.bleed = Math.max(0, Number(d.bleed) || 0);
+    d.cropMarks = !!d.cropMarks;
+    if (!(d.width > 0) || !(d.height > 0)) throw new Error("Invalid page size in project file");
+    return d;
   }
 
   // ---------- history ----------
@@ -290,6 +320,7 @@ export class Editor {
   private afterHistory(): void {
     const ids = new Set(this.doc.shapes.map((s) => s.id));
     this.selectedIds = this.selectedIds.filter((id) => ids.has(id));
+    this.syncBase();
     this.render();
   }
 
@@ -695,9 +726,15 @@ export class Editor {
 
     const parts: string[] = [];
     parts.push(
-      `<rect x="0" y="0" width="${ARTBOARD.width}" height="${ARTBOARD.height}" fill="#ffffff" stroke="#3a3f4b" stroke-width="1" vector-effect="non-scaling-stroke"/>`,
+      `<rect x="0" y="0" width="${this.doc.width}" height="${this.doc.height}" fill="#ffffff" stroke="#3a3f4b" stroke-width="1" vector-effect="non-scaling-stroke"/>`,
     );
     for (const s of this.doc.shapes) parts.push(shapeToSvg(s, true));
+    const bl = this.doc.bleed ?? 0;
+    if (bl > 0) {
+      parts.push(
+        `<rect x="${-bl}" y="${-bl}" width="${this.doc.width + 2 * bl}" height="${this.doc.height + 2 * bl}" fill="none" stroke="#e5484d" stroke-width="1" stroke-dasharray="5 4" vector-effect="non-scaling-stroke" pointer-events="none"/>`,
+      );
+    }
 
     const sel = this.selectedShapes();
     const only = sel.length === 1 ? sel[0] : null;

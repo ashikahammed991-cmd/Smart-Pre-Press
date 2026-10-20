@@ -15,6 +15,9 @@ Draw shapes, build curves with the pen tool, organise layers, and export clean S
 - Multi-select: Shift+click, drag a box on empty canvas, or Ctrl+A; move, recolour, copy and delete them together
 - Zoom (mouse wheel) and pan (Space + drag, or middle mouse button)
 - Copy, paste, duplicate, arrow-key nudging
+- **Pre-press:** page size presets (A3/A4/A5/Letter/business card) or custom mm size, bleed, optional crop marks
+- **CMYK colour:** type C/M/Y/K percentages for fill and stroke
+- **Export print PDF:** all colours as DeviceCMYK, TrimBox + BleedBox set, content clipped to the bleed
 - Undo / redo
 - Save and open projects (`.spp`), export SVG
 - Runs on Windows, macOS and Linux
@@ -35,7 +38,8 @@ Draw shapes, build curves with the pen tool, organise layers, and export clean S
 | Space + drag | Pan |
 | Ctrl+0 / Ctrl++ / Ctrl+- | Reset / zoom in / zoom out |
 | Ctrl+Z / Ctrl+Shift+Z | Undo / redo |
-| Ctrl+S / Ctrl+O / Ctrl+E | Save / open / export SVG |
+| Ctrl+S / Ctrl+O | Save / open project |
+| Ctrl+E / Ctrl+P | Export SVG / export print PDF |
 
 Pen tool: click to add a corner point, click-and-drag to pull out a curve handle.
 
@@ -78,5 +82,8 @@ src/main.ts      UI wiring
 src-tauri/       Rust shell (Tauri)
 .github/         CI and release workflows
 ```
+
+**About colour accuracy:** the RGB-to-CMYK step is a simple mathematical conversion, not an ICC profile. For
+colour-critical jobs type the exact CMYK values yourself and confirm with your printer.
 
 See [ROADMAP.md](ROADMAP.md) for what is planned. License: MIT.

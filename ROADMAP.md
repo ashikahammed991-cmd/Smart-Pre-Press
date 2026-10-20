@@ -28,12 +28,24 @@ A full professional editor is built in stages; each stage ships as a GitHub Rele
 - [ ] Align and distribute
 - [ ] Multiple artboards
 
-## v0.4 - text and import
+## v0.4 - pre-press basics (done)
+- [x] Page size presets, custom size, bleed
+- [x] CMYK fill and stroke
+- [x] Print PDF export with TrimBox/BleedBox and crop marks
+
+## v0.5 - pre-press, next
+- [ ] ICC colour profiles (e.g. FOGRA39, SWOP) and soft-proofing
+- [ ] Spot colours / Pantone-style swatches and a swatches panel
+- [ ] Overprint, rich-black warnings, total ink limit check
+- [ ] Preflight report (missing bleed, low resolution, RGB leftovers)
+- [ ] Registration marks, colour bars, page info slug
+
+## v0.6 - text and import
 - [ ] Text tool, fonts, text on path
 - [ ] Import SVG and raster images
-- [ ] Export PNG and PDF at chosen resolution
+- [ ] Export PNG at chosen resolution
 
-## v0.5 - path operations
+## v0.7 - path operations
 - [ ] Pathfinder: union, subtract, intersect, exclude
 - [ ] Offset path, simplify, outline stroke
 - [ ] Pencil / brush tool with smoothing

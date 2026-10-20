@@ -1,5 +1,5 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { readTextFile, writeFile, writeTextFile } from "@tauri-apps/plugin-fs";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -38,4 +38,22 @@ export async function openText(ext: string, label: string): Promise<string | nul
     };
     input.click();
   });
+}
+
+/** Save binary data (e.g. a PDF): native dialog in the desktop app, download in a plain browser. */
+export async function saveBytes(defaultName: string, bytes: Uint8Array, ext: string, label: string): Promise<boolean> {
+  if (isTauri) {
+    const path = await save({ defaultPath: defaultName, filters: [{ name: label, extensions: [ext] }] });
+    if (!path) return false;
+    await writeFile(path, bytes);
+    return true;
+  }
+  const blob = new Blob([bytes as BlobPart], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = defaultName;
+  a.click();
+  URL.revokeObjectURL(url);
+  return true;
 }
