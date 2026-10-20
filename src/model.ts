@@ -18,6 +18,8 @@ export interface Node {
 
 interface Base extends Style {
   id: string;
+  /** Rotation in degrees around the centre of the shape's bounds. */
+  rot?: number;
 }
 
 export interface RectShape extends Base {
@@ -136,10 +138,30 @@ export function bounds(s: Shape): { x: number; y: number; w: number; h: number }
   }
 }
 
+export function center(s: Shape): Pt {
+  const b = bounds(s);
+  return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+}
+
+export function rotatePt(p: Pt, c: Pt, deg: number): Pt {
+  const a = (deg * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  const dx = p.x - c.x;
+  const dy = p.y - c.y;
+  return { x: c.x + dx * cos - dy * sin, y: c.y + dx * sin + dy * cos };
+}
+
+function rotAttr(s: Shape): string {
+  if (!s.rot) return "";
+  const c = center(s);
+  return ` transform="rotate(${+s.rot.toFixed(2)} ${+c.x.toFixed(2)} ${+c.y.toFixed(2)})"`;
+}
+
 const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 export function shapeToSvg(s: Shape, withId = false): string {
-  const idAttr = withId ? ` data-id="${esc(s.id)}"` : "";
+  const idAttr = (withId ? ` data-id="${esc(s.id)}"` : "") + rotAttr(s);
   const style = `fill="${esc(s.fill)}" stroke="${esc(s.stroke)}" stroke-width="${s.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"`;
   switch (s.kind) {
     case "rect":

@@ -11,6 +11,8 @@ Draw shapes, build curves with the pen tool, organise layers, and export clean S
 - Select, move, delete, bring forward / send backward
 - Fill, stroke colour and stroke width
 - Resize handles (hold Shift on a corner to keep proportions)
+- Rotate with the round knob above a selected shape (hold Shift to snap to 15°)
+- Multi-select: Shift+click, drag a box on empty canvas, or Ctrl+A; move, recolour, copy and delete them together
 - Zoom (mouse wheel) and pan (Space + drag, or middle mouse button)
 - Copy, paste, duplicate, arrow-key nudging
 - Undo / redo
@@ -24,6 +26,8 @@ Draw shapes, build curves with the pen tool, organise layers, and export clean S
 | V / R / E / L / P | Select / Rect / Ellipse / Line / Pen |
 | Enter or double-click | Finish an open pen path |
 | Click first point | Close the pen path |
+| Ctrl+A | Select all |
+| Shift+click | Add / remove a shape from the selection |
 | Del | Delete selection |
 | Ctrl+C / Ctrl+V / Ctrl+D | Copy / paste / duplicate |
 | Arrow keys (Shift = 10x) | Nudge selection |

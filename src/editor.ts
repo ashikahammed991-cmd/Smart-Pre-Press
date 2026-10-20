@@ -7,10 +7,12 @@ import {
   Shape,
   Style,
   bounds,
+  center,
   docToSvg,
   newDoc,
   newId,
   pathData,
+  rotatePt,
   shapeToSvg,
   translate,
 } from "./model";
@@ -31,12 +33,15 @@ type Drag =
   | { type: "draw"; start: Pt; shape: Shape }
   | { type: "handle"; node: Node }
   | { type: "resize"; handle: HandleId; orig: Shape; ob: Box; moved: boolean }
+  | { type: "rotate"; id: string; c: Pt; off: number; moved: boolean }
+  | { type: "marquee"; start: Pt; cur: Pt; base: string[] }
   | { type: "pan"; last: Pt }
   | null;
 
 const CLOSE_DIST = 10;
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 32;
+const ROTATE_OFFSET = 26; // screen pixels above the top edge
 
 const HANDLE_CURSORS: Record<HandleId, string> = {
   nw: "nwse-resize",
@@ -49,11 +54,13 @@ const HANDLE_CURSORS: Record<HandleId, string> = {
   w: "ew-resize",
 };
 
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+
 export class Editor {
   doc: Doc = newDoc();
   tool: ToolName = "select";
   style: Style = { fill: "#4f8cff", stroke: "#1b2a4a", strokeWidth: 2 };
-  selectedId: string | null = null;
+  selectedIds: string[] = [];
 
   /** Called whenever the UI should refresh (layers list, status, etc.). */
   onChange: () => void = () => {};
@@ -64,7 +71,7 @@ export class Editor {
   private drag: Drag = null;
   private penNodes: Node[] = [];
   private hover: Pt | null = null;
-  private clip: Shape | null = null;
+  private clip: Shape[] = [];
   private spaceDown = false;
 
   private readonly baseView: Box = { x: -100, y: -100, w: 1200, h: 900 };
@@ -94,13 +101,13 @@ export class Editor {
     return Math.round((this.baseView.w / this.view.w) * 100);
   }
 
-  zoomAt(factor: number, center: Pt): void {
+  zoomAt(factor: number, c: Pt): void {
     const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, (this.baseView.w / this.view.w) * factor));
     const newW = this.baseView.w / zoom;
     const k = newW / this.view.w;
     this.view = {
-      x: center.x - (center.x - this.view.x) * k,
-      y: center.y - (center.y - this.view.y) * k,
+      x: c.x - (c.x - this.view.x) * k,
+      y: c.y - (c.y - this.view.y) * k,
       w: newW,
       h: this.view.h * k,
     };
@@ -130,12 +137,48 @@ export class Editor {
     this.svg.style.cursor = this.spaceDown ? "grab" : this.tool === "select" ? "default" : "crosshair";
   }
 
+  // ---------- selection ----------
+
+  isSelected(id: string): boolean {
+    return this.selectedIds.includes(id);
+  }
+
+  /** The first selected shape (used to mirror colours into the property inputs). */
+  selected(): Shape | undefined {
+    return this.doc.shapes.find((s) => this.isSelected(s.id));
+  }
+
+  private selectedShapes(): Shape[] {
+    return this.doc.shapes.filter((s) => this.isSelected(s.id));
+  }
+
+  select(id: string | null, additive = false): void {
+    if (id === null) this.selectedIds = [];
+    else if (additive) {
+      this.selectedIds = this.isSelected(id) ? this.selectedIds.filter((x) => x !== id) : [...this.selectedIds, id];
+    } else this.selectedIds = [id];
+    this.reportSelection();
+    this.render();
+  }
+
+  selectAll(): void {
+    this.selectedIds = this.doc.shapes.map((s) => s.id);
+    this.reportSelection();
+    this.render();
+  }
+
+  private reportSelection(): void {
+    const n = this.selectedIds.length;
+    if (n === 1) this.onStatus(`Selected ${this.selected()?.kind}`);
+    else if (n > 1) this.onStatus(`${n} shapes selected`);
+  }
+
   // ---------- public API ----------
 
   setTool(t: ToolName): void {
     if (this.tool === "pen" && t !== "pen") this.finishPen(false);
     this.tool = t;
-    if (t !== "select") this.selectedId = null;
+    if (t !== "select") this.selectedIds = [];
     this.updateCursor();
     this.onStatus(`Tool: ${t}`);
     this.render();
@@ -143,37 +186,28 @@ export class Editor {
 
   setStyle(patch: Partial<Style>): void {
     Object.assign(this.style, patch);
-    const s = this.selected();
-    if (s) {
+    const sel = this.selectedShapes();
+    if (sel.length) {
       this.pushUndo();
-      Object.assign(s, patch);
+      for (const s of sel) Object.assign(s, patch);
       this.render();
     }
   }
 
-  selected(): Shape | undefined {
-    return this.doc.shapes.find((s) => s.id === this.selectedId);
-  }
-
-  select(id: string | null): void {
-    this.selectedId = id;
-    const s = this.selected();
-    if (s) this.onStatus(`Selected ${s.kind}`);
-    this.render();
-  }
-
   deleteSelected(): void {
-    if (!this.selectedId) return;
+    if (!this.selectedIds.length) return;
     this.pushUndo();
-    this.doc.shapes = this.doc.shapes.filter((s) => s.id !== this.selectedId);
-    this.selectedId = null;
+    this.doc.shapes = this.doc.shapes.filter((s) => !this.isSelected(s.id));
+    this.selectedIds = [];
     this.render();
   }
 
   reorder(direction: 1 | -1): void {
-    const i = this.doc.shapes.findIndex((s) => s.id === this.selectedId);
+    const first = this.selected();
+    if (!first || this.selectedIds.length !== 1) return;
+    const i = this.doc.shapes.indexOf(first);
     const j = i + direction;
-    if (i < 0 || j < 0 || j >= this.doc.shapes.length) return;
+    if (j < 0 || j >= this.doc.shapes.length) return;
     this.pushUndo();
     const arr = this.doc.shapes;
     [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -181,21 +215,23 @@ export class Editor {
   }
 
   copy(): void {
-    const s = this.selected();
-    if (!s) return;
-    this.clip = JSON.parse(JSON.stringify(s));
-    this.onStatus("Copied");
+    const sel = this.selectedShapes();
+    if (!sel.length) return;
+    this.clip = clone(sel);
+    this.onStatus(sel.length === 1 ? "Copied" : `Copied ${sel.length} shapes`);
   }
 
   paste(): void {
-    if (!this.clip) return;
-    const s = JSON.parse(JSON.stringify(this.clip)) as Shape;
-    s.id = newId();
-    translate(s, 20, 20);
-    this.clip = JSON.parse(JSON.stringify(s)); // repeated pastes cascade
+    if (!this.clip.length) return;
+    const pasted = clone(this.clip);
+    for (const s of pasted) {
+      s.id = newId();
+      translate(s, 20, 20);
+    }
+    this.clip = clone(pasted); // repeated pastes cascade
     this.pushUndo();
-    this.doc.shapes.push(s);
-    this.selectedId = s.id;
+    this.doc.shapes.push(...pasted);
+    this.selectedIds = pasted.map((s) => s.id);
     this.render();
   }
 
@@ -223,7 +259,7 @@ export class Editor {
   loadDoc(doc: Doc): void {
     this.pushUndo();
     this.doc = doc;
-    this.selectedId = null;
+    this.selectedIds = [];
     this.render();
   }
 
@@ -252,7 +288,8 @@ export class Editor {
   }
 
   private afterHistory(): void {
-    if (!this.selected()) this.selectedId = null;
+    const ids = new Set(this.doc.shapes.map((s) => s.id));
+    this.selectedIds = this.selectedIds.filter((id) => ids.has(id));
     this.render();
   }
 
@@ -284,25 +321,45 @@ export class Editor {
     switch (this.tool) {
       case "select": {
         const target = e.target as Element;
+        const single = this.selectedIds.length === 1 ? this.selected() : undefined;
+
+        if (single && target.closest("[data-rotate]")) {
+          const c = center(single);
+          const a0 = (Math.atan2(p.y - c.y, p.x - c.x) * 180) / Math.PI;
+          this.pushUndo();
+          this.drag = { type: "rotate", id: single.id, c, off: (single.rot ?? 0) - a0, moved: false };
+          break;
+        }
+
         const handleEl = target.closest("[data-handle]");
-        const sel = this.selected();
-        if (handleEl && sel) {
+        if (single && handleEl) {
           this.pushUndo();
           this.drag = {
             type: "resize",
             handle: handleEl.getAttribute("data-handle") as HandleId,
-            orig: JSON.parse(JSON.stringify(sel)),
-            ob: bounds(sel),
+            orig: clone(single),
+            ob: bounds(single),
             moved: false,
           };
           break;
         }
-        const el = target.closest("[data-id]");
-        const id = el?.getAttribute("data-id") ?? null;
-        this.selectedId = id;
+
+        const id = target.closest("[data-id]")?.getAttribute("data-id") ?? null;
         if (id) {
-          this.pushUndo();
-          this.drag = { type: "move", last: p, moved: false };
+          if (e.shiftKey) {
+            this.select(id, true);
+          } else if (!this.isSelected(id)) {
+            this.select(id);
+          }
+          if (this.isSelected(id)) {
+            this.pushUndo();
+            this.drag = { type: "move", last: p, moved: false };
+          }
+        } else {
+          // Empty canvas: start a selection rectangle.
+          const base = e.shiftKey ? [...this.selectedIds] : [];
+          this.selectedIds = base;
+          this.drag = { type: "marquee", start: p, cur: p, base };
         }
         this.render();
         break;
@@ -353,14 +410,31 @@ export class Editor {
     this.hover = p;
 
     if (d?.type === "move") {
-      const s = this.selected();
-      if (s) {
-        translate(s, p.x - d.last.x, p.y - d.last.y);
-        d.last = p;
-        d.moved = true;
-      }
+      const dx = p.x - d.last.x;
+      const dy = p.y - d.last.y;
+      for (const s of this.selectedShapes()) translate(s, dx, dy);
+      d.last = p;
+      d.moved = true;
     } else if (d?.type === "resize") {
       this.doResize(d, p, e.shiftKey);
+    } else if (d?.type === "rotate") {
+      const s = this.doc.shapes.find((x) => x.id === d.id);
+      if (s) {
+        let ang = (Math.atan2(p.y - d.c.y, p.x - d.c.x) * 180) / Math.PI + d.off;
+        if (e.shiftKey) ang = Math.round(ang / 15) * 15;
+        ang = ((((ang + 180) % 360) + 360) % 360) - 180;
+        s.rot = Math.round(ang * 100) / 100;
+        d.moved = true;
+        this.onStatus(`Rotation ${Math.round(s.rot)}°`);
+      }
+    } else if (d?.type === "marquee") {
+      d.cur = p;
+      const r = this.marqueeBox(d);
+      const hit = this.doc.shapes.filter((s) => {
+        const b = bounds(s);
+        return b.x <= r.x + r.w && b.x + b.w >= r.x && b.y <= r.y + r.h && b.y + b.h >= r.y;
+      });
+      this.selectedIds = [...new Set([...d.base, ...hit.map((s) => s.id)])];
     } else if (d?.type === "draw") {
       const s = d.shape;
       const { start } = d;
@@ -401,12 +475,23 @@ export class Editor {
         this.doc.shapes = this.doc.shapes.filter((s) => s.id !== d.shape.id);
         this.undoStack.pop();
       } else {
-        this.selectedId = d.shape.id;
+        this.selectedIds = [d.shape.id];
       }
-    } else if ((d?.type === "move" || d?.type === "resize") && !d.moved) {
+    } else if ((d?.type === "move" || d?.type === "resize" || d?.type === "rotate") && !d.moved) {
       this.undoStack.pop(); // a plain click is not an edit
+    } else if (d?.type === "marquee") {
+      this.reportSelection();
     }
     this.render();
+  }
+
+  private marqueeBox(d: { start: Pt; cur: Pt }): Box {
+    return {
+      x: Math.min(d.start.x, d.cur.x),
+      y: Math.min(d.start.y, d.cur.y),
+      w: Math.abs(d.cur.x - d.start.x),
+      h: Math.abs(d.cur.y - d.start.y),
+    };
   }
 
   private onKey(e: KeyboardEvent): void {
@@ -436,6 +521,12 @@ export class Editor {
         case "d":
           e.preventDefault();
           this.duplicate();
+          return;
+        case "a":
+          e.preventDefault();
+          this.setTool("select");
+          this.selectAll();
+          this.onChange();
           return;
         case "0":
           e.preventDefault();
@@ -471,13 +562,13 @@ export class Editor {
       return;
     }
 
-    if (e.key.startsWith("Arrow") && this.selected()) {
+    if (e.key.startsWith("Arrow") && this.selectedIds.length) {
       e.preventDefault();
       const step = e.shiftKey ? 10 : 1;
       const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
       const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
       this.pushUndo();
-      translate(this.selected()!, dx, dy);
+      for (const s of this.selectedShapes()) translate(s, dx, dy);
       this.render();
       return;
     }
@@ -486,7 +577,7 @@ export class Editor {
     else if (e.key === "Enter") this.finishPen(false);
     else if (e.key === "Escape") {
       this.penNodes = [];
-      this.selectedId = null;
+      this.selectedIds = [];
       this.render();
     }
   }
@@ -499,10 +590,15 @@ export class Editor {
     if (this.drag?.type !== "pan") this.updateCursor();
   }
 
-  // ---------- resize ----------
+  // ---------- resize (works on rotated shapes too) ----------
 
-  private doResize(d: Extract<Drag, { type: "resize" }>, p: Pt, keepRatio: boolean): void {
+  private doResize(d: Extract<Drag, { type: "resize" }>, pWorld: Pt, keepRatio: boolean): void {
     const { handle, orig, ob } = d;
+    const rot = orig.rot ?? 0;
+    const c0 = { x: ob.x + ob.w / 2, y: ob.y + ob.h / 2 };
+    // Work in the shape's own (unrotated) frame.
+    const p = rot ? rotatePt(pWorld, c0, -rot) : pWorld;
+
     const movesW = handle.includes("w");
     const movesE = handle.includes("e");
     const movesN = handle.includes("n");
@@ -529,7 +625,16 @@ export class Editor {
 
     const i = this.doc.shapes.findIndex((s) => s.id === orig.id);
     if (i < 0) return;
-    this.doc.shapes[i] = this.scaled(orig, ax, ay, sx, sy);
+    const next = this.scaled(orig, ax, ay, sx, sy);
+
+    // Rotation happens around the new centre, so shift the shape to keep the anchor corner still on screen.
+    if (rot) {
+      const anchor = { x: ax, y: ay };
+      const before = rotatePt(anchor, c0, rot);
+      const after = rotatePt(anchor, center(next), rot);
+      translate(next, before.x - after.x, before.y - after.y);
+    }
+    this.doc.shapes[i] = next;
     d.moved = true;
   }
 
@@ -575,7 +680,7 @@ export class Editor {
       const shape: PathShape = { id: newId(), kind: "path", nodes: this.penNodes, closed, ...this.style };
       this.pushUndo();
       this.doc.shapes.push(shape);
-      this.selectedId = shape.id;
+      this.selectedIds = [shape.id];
     }
     this.penNodes = [];
     this.drag = null;
@@ -594,29 +699,44 @@ export class Editor {
     );
     for (const s of this.doc.shapes) parts.push(shapeToSvg(s, true));
 
-    const sel = this.selected();
-    if (sel) {
-      const b = bounds(sel);
-      parts.push(
-        `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="none" stroke="#2f7cf6" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`,
-      );
-      const half = 4 * px;
-      const pos: Record<HandleId, [number, number]> = {
-        nw: [b.x, b.y],
-        n: [b.x + b.w / 2, b.y],
-        ne: [b.x + b.w, b.y],
-        e: [b.x + b.w, b.y + b.h / 2],
-        se: [b.x + b.w, b.y + b.h],
-        s: [b.x + b.w / 2, b.y + b.h],
-        sw: [b.x, b.y + b.h],
-        w: [b.x, b.y + b.h / 2],
-      };
-      for (const id of Object.keys(pos) as HandleId[]) {
-        const [hx, hy] = pos[id];
-        parts.push(
-          `<rect data-handle="${id}" x="${hx - half}" y="${hy - half}" width="${half * 2}" height="${half * 2}" fill="#ffffff" stroke="#2f7cf6" stroke-width="1" vector-effect="non-scaling-stroke" style="cursor:${HANDLE_CURSORS[id]}"/>`,
-        );
+    const sel = this.selectedShapes();
+    const only = sel.length === 1 ? sel[0] : null;
+    for (const s of sel) {
+      const b = bounds(s);
+      const c = center(s);
+      const rot = s.rot ? ` transform="rotate(${s.rot} ${c.x} ${c.y})"` : "";
+      let g = `<g${rot}><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="none" stroke="#2f7cf6" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+
+      if (s === only) {
+        const half = 4 * px;
+        const pos: Record<HandleId, [number, number]> = {
+          nw: [b.x, b.y],
+          n: [b.x + b.w / 2, b.y],
+          ne: [b.x + b.w, b.y],
+          e: [b.x + b.w, b.y + b.h / 2],
+          se: [b.x + b.w, b.y + b.h],
+          s: [b.x + b.w / 2, b.y + b.h],
+          sw: [b.x, b.y + b.h],
+          w: [b.x, b.y + b.h / 2],
+        };
+        for (const id of Object.keys(pos) as HandleId[]) {
+          const [hx, hy] = pos[id];
+          g += `<rect data-handle="${id}" x="${hx - half}" y="${hy - half}" width="${half * 2}" height="${half * 2}" fill="#ffffff" stroke="#2f7cf6" stroke-width="1" vector-effect="non-scaling-stroke" style="cursor:${HANDLE_CURSORS[id]}"/>`;
+        }
+        // Rotation handle: a knob above the top edge.
+        const ry = b.y - ROTATE_OFFSET * px;
+        g += `<line x1="${c.x}" y1="${b.y}" x2="${c.x}" y2="${ry}" stroke="#2f7cf6" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+        g += `<circle data-rotate="1" cx="${c.x}" cy="${ry}" r="${5 * px}" fill="#ffffff" stroke="#2f7cf6" stroke-width="1" vector-effect="non-scaling-stroke" style="cursor:crosshair"/>`;
       }
+      parts.push(g + "</g>");
+    }
+
+    const d = this.drag;
+    if (d?.type === "marquee") {
+      const r = this.marqueeBox(d);
+      parts.push(
+        `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="rgba(47,124,246,0.12)" stroke="#2f7cf6" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`,
+      );
     }
 
     if (this.tool === "pen" && this.penNodes.length > 0) {

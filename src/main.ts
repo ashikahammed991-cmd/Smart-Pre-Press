@@ -38,10 +38,10 @@ function refreshUi(): void {
   [...editor.doc.shapes].reverse().forEach((s, i) => {
     const li = document.createElement("li");
     li.textContent = `${s.kind} ${editor.doc.shapes.length - i}`;
-    li.className = s.id === editor.selectedId ? "selected" : "";
-    li.addEventListener("click", () => {
+    li.className = editor.isSelected(s.id) ? "selected" : "";
+    li.addEventListener("click", (e) => {
       editor.setTool("select");
-      editor.select(s.id);
+      editor.select(s.id, e.shiftKey || e.ctrlKey || e.metaKey);
     });
     const sw = document.createElement("span");
     sw.className = "swatch";

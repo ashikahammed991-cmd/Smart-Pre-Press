@@ -16,7 +16,7 @@ A full professional editor is built in stages; each stage ships as a GitHub Rele
 ## v0.2 - editing precision
 - [x] Zoom and pan (wheel, space+drag)
 - [x] Resize handles
-- [ ] Rotate handles, multi-select, marquee select
+- [x] Rotate handle, multi-select, marquee select
 - [ ] Direct selection: move anchors and handles of existing paths
 - [ ] Snapping, guides, rulers, grid
 - [x] Copy / paste / duplicate
