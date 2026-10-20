@@ -23,7 +23,7 @@ A full professional editor is built in stages; each stage ships as a GitHub Rele
 - [ ] Group / ungroup
 
 ## v0.3 - layers and appearance
-- [ ] Real layers panel: names, visibility, lock, nesting
+- [ ] Nested layers and groups
 - [ ] Gradients, opacity, dashed strokes, blend modes
 - [ ] Align and distribute
 - [ ] Multiple artboards
@@ -33,19 +33,24 @@ A full professional editor is built in stages; each stage ships as a GitHub Rele
 - [x] CMYK fill and stroke
 - [x] Print PDF export with TrimBox/BleedBox and crop marks
 
-## v0.5 - pre-press, next
+## v0.5 - swatches, layers, preflight (done)
+- [x] Swatches panel (CMYK)
+- [x] Preflight checks: missing bleed, ink limit, hairlines, RGB, small bleed
+- [x] Layer hide / lock / rename
+
+## v0.6 - pre-press, next
 - [ ] ICC colour profiles (e.g. FOGRA39, SWOP) and soft-proofing
-- [ ] Spot colours / Pantone-style swatches and a swatches panel
+- [ ] Spot colours / Pantone-style named inks
 - [ ] Overprint, rich-black warnings, total ink limit check
-- [ ] Preflight report (missing bleed, low resolution, RGB leftovers)
+- [ ] Preflight: low-resolution images, fonts not embedded (once text and images exist)
 - [ ] Registration marks, colour bars, page info slug
 
-## v0.6 - text and import
+## v0.7 - text and import
 - [ ] Text tool, fonts, text on path
 - [ ] Import SVG and raster images
 - [ ] Export PNG at chosen resolution
 
-## v0.7 - path operations
+## v0.8 - path operations
 - [ ] Pathfinder: union, subtract, intersect, exclude
 - [ ] Offset path, simplify, outline stroke
 - [ ] Pencil / brush tool with smoothing

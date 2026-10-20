@@ -25,6 +25,12 @@ interface Base extends Style {
   id: string;
   /** Rotation in degrees around the centre of the shape's bounds. */
   rot?: number;
+  /** Custom layer name. */
+  name?: string;
+  /** Hidden shapes are not drawn and not exported. */
+  hidden?: boolean;
+  /** Locked shapes cannot be selected or moved on the canvas. */
+  locked?: boolean;
 }
 
 export interface RectShape extends Base {
@@ -56,6 +62,24 @@ export interface PathShape extends Base {
 
 export type Shape = RectShape | EllipseShape | LineShape | PathShape;
 
+export interface Swatch {
+  name: string;
+  cmyk: Cmyk;
+}
+
+/** Colours every new document starts with (CMYK 0..1). */
+export const DEFAULT_SWATCHES: Swatch[] = [
+  { name: "Black", cmyk: [0, 0, 0, 1] },
+  { name: "White", cmyk: [0, 0, 0, 0] },
+  { name: "Cyan", cmyk: [1, 0, 0, 0] },
+  { name: "Magenta", cmyk: [0, 1, 0, 0] },
+  { name: "Yellow", cmyk: [0, 0, 1, 0] },
+  { name: "Red", cmyk: [0, 1, 1, 0] },
+  { name: "Green", cmyk: [1, 0, 1, 0] },
+  { name: "Blue", cmyk: [1, 1, 0, 0] },
+  { name: "Rich Black", cmyk: [0.6, 0.4, 0.4, 1] },
+];
+
 export interface Doc {
   /** Trim size in px (1 px = 1/96 inch). */
   width: number;
@@ -64,6 +88,8 @@ export interface Doc {
   bleed?: number;
   /** Add crop marks to the PDF export. */
   cropMarks?: boolean;
+  /** Saved colours (the swatches panel). */
+  swatches?: Swatch[];
   shapes: Shape[]; // painted in array order (last = on top)
 }
 
@@ -79,7 +105,7 @@ export function newId(): string {
 
 /** A new A4 portrait document with 3 mm bleed. */
 export function newDoc(): Doc {
-  return { width: mmToPx(210), height: mmToPx(297), bleed: mmToPx(3), cropMarks: false, shapes: [] };
+  return { width: mmToPx(210), height: mmToPx(297), bleed: mmToPx(3), cropMarks: false, swatches: JSON.parse(JSON.stringify(DEFAULT_SWATCHES)), shapes: [] };
 }
 
 export function pathData(nodes: Node[], closed: boolean): string {
@@ -174,7 +200,9 @@ function rotAttr(s: Shape): string {
 const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 export function shapeToSvg(s: Shape, withId = false): string {
-  const idAttr = (withId ? ` data-id="${esc(s.id)}"` : "") + rotAttr(s);
+  if (s.hidden) return "";
+  // On the canvas a locked shape is drawn but cannot be clicked.
+  const idAttr = (withId ? (s.locked ? ' pointer-events="none"' : ` data-id="${esc(s.id)}"`) : "") + rotAttr(s);
   const style = `fill="${esc(s.fill)}" stroke="${esc(s.stroke)}" stroke-width="${s.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"`;
   switch (s.kind) {
     case "rect":
@@ -190,7 +218,10 @@ export function shapeToSvg(s: Shape, withId = false): string {
 }
 
 export function docToSvg(doc: Doc): string {
-  const body = doc.shapes.map((s) => "  " + shapeToSvg(s)).join("\n");
+  const body = doc.shapes
+    .filter((s) => !s.hidden)
+    .map((s) => "  " + shapeToSvg(s))
+    .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${doc.width}" height="${doc.height}" viewBox="0 0 ${doc.width} ${doc.height}">
 ${body}

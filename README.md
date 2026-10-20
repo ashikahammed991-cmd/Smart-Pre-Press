@@ -18,6 +18,9 @@ Draw shapes, build curves with the pen tool, organise layers, and export clean S
 - **Pre-press:** page size presets (A3/A4/A5/Letter/business card) or custom mm size, bleed, optional crop marks
 - **CMYK colour:** type C/M/Y/K percentages for fill and stroke
 - **Export print PDF:** all colours as DeviceCMYK, TrimBox + BleedBox set, content clipped to the bleed
+- **Swatches:** save CMYK colours, apply to fill or stroke in one click
+- **Preflight:** live checklist (missing bleed, ink over 300%, hairline strokes, RGB leftovers, small bleed)
+- Layers: hide, lock and rename (double-click the name)
 - Undo / redo
 - Save and open projects (`.spp`), export SVG
 - Runs on Windows, macOS and Linux

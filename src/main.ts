@@ -4,6 +4,7 @@ import { openText, saveBytes, saveText } from "./io";
 import { Cmyk, clampCmyk, cmykToHex, hexToCmyk } from "./color";
 import { mmToPx, pxToMm } from "./model";
 import { docToPdf, pdfBytes } from "./pdf";
+import { preflight } from "./preflight";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = (id: string) => $<HTMLInputElement>(id);
@@ -118,30 +119,166 @@ docBleed.addEventListener("change", () => {
 });
 docMarks.addEventListener("change", () => editor.setDocument({ cropMarks: docMarks.checked }));
 
+// ---------- swatches ----------
+const swatchBox = $("swatches");
+let swatchKey = "";
+
+function applyTarget(): "fill" | "stroke" {
+  return document.querySelector<HTMLInputElement>('input[name="apply"]:checked')?.value === "stroke" ? "stroke" : "fill";
+}
+
+function renderSwatches(): void {
+  const list = editor.swatches();
+  const key = JSON.stringify(list);
+  if (key === swatchKey) return;
+  swatchKey = key;
+  swatchBox.innerHTML = "";
+  list.forEach((sw, i) => {
+    const b = document.createElement("button");
+    b.className = "swatch-btn";
+    b.style.background = cmykToHex(sw.cmyk);
+    const pct = sw.cmyk.map((v) => Math.round(v * 100));
+    b.title = `${sw.name}  (C${pct[0]} M${pct[1]} Y${pct[2]} K${pct[3]})`;
+    b.addEventListener("click", () => {
+      const target = applyTarget();
+      editor.applySwatch(i, target);
+      const hex = cmykToHex(sw.cmyk);
+      if (target === "fill") {
+        fill.value = hex;
+        setCmykInputs("f", sw.cmyk);
+      } else {
+        stroke.value = hex;
+        setCmykInputs("s", sw.cmyk);
+      }
+    });
+    b.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      editor.removeSwatch(i);
+    });
+    swatchBox.appendChild(b);
+  });
+}
+$("btn-add-swatch").addEventListener("click", () => editor.addSwatch(readCmyk(applyTarget() === "fill" ? "f" : "s")));
+
+// ---------- preflight ----------
+const pfList = $("preflight");
+const pfBadge = $("pf-badge");
+let pfKey = "";
+
+function renderPreflight(): void {
+  const issues = preflight(editor.doc);
+  const key = JSON.stringify(issues);
+  if (key === pfKey) return;
+  pfKey = key;
+  pfList.innerHTML = "";
+  for (const it of issues) {
+    const li = document.createElement("li");
+    li.className = it.level;
+    li.textContent = it.text;
+    pfList.appendChild(li);
+  }
+  const errors = issues.filter((i) => i.level === "error").length;
+  const warns = issues.filter((i) => i.level === "warn").length;
+  pfBadge.className = `badge ${errors ? "bad" : warns ? "warn" : "good"}`;
+  pfBadge.textContent = errors + warns > 0 ? String(errors + warns) : "OK";
+}
+
 // ---------- layers panel ----------
 const layerList = $("layer-list");
 let lastSelectedForProps: string | null = null;
+let layerKey = "";
+
+const SVG_ATTR = 'viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const ICON_EYE = `<svg ${SVG_ATTR}><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const ICON_EYE_OFF = `<svg ${SVG_ATTR}><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><path d="M3 3l18 18"/></svg>`;
+const ICON_LOCK = `<svg ${SVG_ATTR}><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`;
+const ICON_UNLOCK = `<svg ${SVG_ATTR}><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7-2.6"/></svg>`;
+
+function iconButton(html: string, title: string, on: boolean, handler: () => void): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.className = "icon-btn" + (on ? " on" : "");
+  b.title = title;
+  b.innerHTML = html;
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handler();
+  });
+  b.addEventListener("dblclick", (e) => e.stopPropagation());
+  return b;
+}
+
+function startRename(nameEl: HTMLElement, id: string, current: string): void {
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "name-input";
+  inp.value = current;
+  let done = false;
+  const commit = (save: boolean) => {
+    if (done) return;
+    done = true;
+    const value = inp.value;
+    inp.remove();
+    layerKey = ""; // force the list to rebuild
+    if (save) editor.renameShape(id, value);
+    refreshUi();
+  };
+  inp.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") commit(true);
+    else if (e.key === "Escape") commit(false);
+  });
+  inp.addEventListener("blur", () => commit(true));
+  inp.addEventListener("click", (e) => e.stopPropagation());
+  nameEl.replaceWith(inp);
+  inp.focus();
+  inp.select();
+}
 
 function refreshUi(): void {
   toolButtons.forEach((b) => b.classList.toggle("active", b.dataset.tool === editor.tool));
   $("btn-zoom-reset").textContent = `${editor.zoomPercent()}%`;
   syncDocInputs();
+  renderSwatches();
+  renderPreflight();
 
-  layerList.innerHTML = "";
-  [...editor.doc.shapes].reverse().forEach((s, i) => {
-    const li = document.createElement("li");
-    li.textContent = `${s.kind} ${editor.doc.shapes.length - i}`;
-    li.className = editor.isSelected(s.id) ? "selected" : "";
-    li.addEventListener("click", (e) => {
-      editor.setTool("select");
-      editor.select(s.id, e.shiftKey || e.ctrlKey || e.metaKey);
+  // Rebuild only when something shown in the list changed (keeps double-click rename working,
+  // and never rebuild while a name is being edited).
+  const key = JSON.stringify(
+    editor.doc.shapes.map((s) => [s.id, s.kind, s.name, s.hidden, s.locked, s.kind === "line" ? s.stroke : s.fill, editor.isSelected(s.id)]),
+  );
+  if (key !== layerKey && !layerList.querySelector(".name-input")) {
+    layerKey = key;
+    layerList.innerHTML = "";
+    [...editor.doc.shapes].reverse().forEach((s, i) => {
+      const li = document.createElement("li");
+      const label = s.name || `${s.kind} ${editor.doc.shapes.length - i}`;
+      li.className = [editor.isSelected(s.id) ? "selected" : "", s.hidden ? "is-hidden" : "", s.locked ? "is-locked" : ""].join(" ").trim();
+
+      const sw = document.createElement("span");
+      sw.className = "swatch";
+      sw.style.background = s.kind === "line" ? s.stroke : s.fill;
+      const nameEl = document.createElement("span");
+      nameEl.className = "name";
+      nameEl.textContent = label;
+      nameEl.title = "Double-click to rename";
+      nameEl.addEventListener("dblclick", (e) => {
+        e.stopPropagation();
+        startRename(nameEl, s.id, s.name ?? "");
+      });
+
+      li.append(
+        sw,
+        nameEl,
+        iconButton(s.hidden ? ICON_EYE_OFF : ICON_EYE, s.hidden ? "Show" : "Hide", !!s.hidden, () => editor.toggleHidden(s.id)),
+        iconButton(s.locked ? ICON_LOCK : ICON_UNLOCK, s.locked ? "Unlock" : "Lock", !!s.locked, () => editor.toggleLocked(s.id)),
+      );
+      li.addEventListener("click", (e) => {
+        editor.setTool("select");
+        editor.select(s.id, e.shiftKey || e.ctrlKey || e.metaKey);
+      });
+      layerList.appendChild(li);
     });
-    const sw = document.createElement("span");
-    sw.className = "swatch";
-    sw.style.background = s.kind === "line" ? s.stroke : s.fill;
-    li.prepend(sw);
-    layerList.appendChild(li);
-  });
+  }
 
   // Mirror the selected shape's colours into the property inputs.
   const sel = editor.selected();
@@ -168,7 +305,10 @@ async function doExport(): Promise<void> {
 }
 async function doExportPdf(): Promise<void> {
   const bytes = pdfBytes(docToPdf(editor.doc));
-  if (await saveBytes("print.pdf", bytes, "pdf", "PDF")) status.textContent = "Exported print PDF (CMYK)";
+  if (await saveBytes("print.pdf", bytes, "pdf", "PDF")) {
+    const problems = preflight(editor.doc).filter((i) => i.level === "error" || i.level === "warn").length;
+    status.textContent = problems ? `Exported print PDF (CMYK) with ${problems} preflight warning${problems === 1 ? "" : "s"}` : "Exported print PDF (CMYK)";
+  }
 }
 async function doSave(): Promise<void> {
   if (await saveText("project.spp", editor.toProjectJson(), "spp", "Smart Pre-Press project")) status.textContent = "Project saved";

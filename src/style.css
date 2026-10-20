@@ -266,3 +266,121 @@ button.primary {
   background: var(--accent);
   border-color: var(--accent);
 }
+
+.apply-to {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 8px;
+  color: var(--muted);
+}
+.apply-to label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+#swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.swatch-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.badge {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  font-size: 11px;
+  text-align: center;
+  color: #fff;
+  letter-spacing: 0;
+}
+.badge.bad {
+  background: #d6453d;
+}
+.badge.warn {
+  background: #c98a1b;
+}
+.badge.good {
+  background: #2f9e5b;
+}
+.badge:empty {
+  display: none;
+}
+#preflight {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#preflight li {
+  margin-bottom: 6px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border-left: 3px solid var(--border);
+  background: var(--panel-2);
+  font-size: 12px;
+  line-height: 1.35;
+}
+#preflight li.error {
+  border-left-color: #d6453d;
+}
+#preflight li.warn {
+  border-left-color: #c98a1b;
+}
+#preflight li.ok {
+  border-left-color: #2f9e5b;
+}
+#preflight li.info {
+  color: var(--muted);
+}
+#layer-list li .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#layer-list li .name-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 2px 4px;
+}
+#layer-list li.is-hidden .name,
+#layer-list li.is-hidden .swatch {
+  opacity: 0.4;
+}
+#layer-list li.is-locked .name {
+  font-style: italic;
+}
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+}
+.icon-btn:hover {
+  opacity: 1;
+  border: 0;
+}
+.icon-btn.on {
+  opacity: 1;
+}

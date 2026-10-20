@@ -1,4 +1,6 @@
+import { Cmyk, cmykToHex } from "./color";
 import {
+  DEFAULT_SWATCHES,
   Doc,
   Node,
   PathShape,
@@ -166,7 +168,15 @@ export class Editor {
     return this.doc.shapes.filter((s) => this.isSelected(s.id));
   }
 
+  private selectable(s: Shape): boolean {
+    return !s.hidden && !s.locked;
+  }
+
   select(id: string | null, additive = false): void {
+    if (id !== null) {
+      const target = this.doc.shapes.find((s) => s.id === id);
+      if (!target || !this.selectable(target)) return;
+    }
     if (id === null) this.selectedIds = [];
     else if (additive) {
       this.selectedIds = this.isSelected(id) ? this.selectedIds.filter((x) => x !== id) : [...this.selectedIds, id];
@@ -175,8 +185,15 @@ export class Editor {
     this.render();
   }
 
+  selectMany(ids: string[]): void {
+    const have = new Set(this.doc.shapes.map((s) => s.id));
+    this.selectedIds = ids.filter((id) => have.has(id));
+    this.reportSelection();
+    this.render();
+  }
+
   selectAll(): void {
-    this.selectedIds = this.doc.shapes.map((s) => s.id);
+    this.selectedIds = this.doc.shapes.filter((s) => this.selectable(s)).map((s) => s.id);
     this.reportSelection();
     this.render();
   }
@@ -278,6 +295,71 @@ export class Editor {
     this.render();
   }
 
+  // ---------- layers ----------
+
+  toggleHidden(id: string): void {
+    const s = this.doc.shapes.find((x) => x.id === id);
+    if (!s) return;
+    this.pushUndo();
+    s.hidden = !s.hidden;
+    if (s.hidden) this.selectedIds = this.selectedIds.filter((x) => x !== id);
+    this.render();
+  }
+
+  toggleLocked(id: string): void {
+    const s = this.doc.shapes.find((x) => x.id === id);
+    if (!s) return;
+    this.pushUndo();
+    s.locked = !s.locked;
+    if (s.locked) this.selectedIds = this.selectedIds.filter((x) => x !== id);
+    this.render();
+  }
+
+  renameShape(id: string, name: string): void {
+    const s = this.doc.shapes.find((x) => x.id === id);
+    const clean = name.trim();
+    if (!s || (s.name ?? "") === clean) return;
+    this.pushUndo();
+    if (clean) s.name = clean;
+    else delete s.name;
+    this.render();
+  }
+
+  // ---------- swatches ----------
+
+  swatches(): { name: string; cmyk: Cmyk }[] {
+    return this.doc.swatches ?? [];
+  }
+
+  addSwatch(cmyk: Cmyk): void {
+    const list = this.swatches();
+    const same = (a: Cmyk, b: Cmyk) => a.every((v, i) => Math.abs(v - b[i]) < 0.005);
+    if (list.some((s) => same(s.cmyk, cmyk))) {
+      this.onStatus("That colour is already in the swatches");
+      return;
+    }
+    this.pushUndo();
+    const pct = cmyk.map((v) => Math.round(v * 100));
+    this.doc.swatches = [...list, { name: `C${pct[0]} M${pct[1]} Y${pct[2]} K${pct[3]}`, cmyk }];
+    this.render();
+  }
+
+  removeSwatch(index: number): void {
+    const list = this.swatches();
+    if (index < 0 || index >= list.length) return;
+    this.pushUndo();
+    this.doc.swatches = list.filter((_, i) => i !== index);
+    this.render();
+  }
+
+  /** Apply swatch `index` as the fill or stroke colour (of the selection and of new shapes). */
+  applySwatch(index: number, target: "fill" | "stroke"): void {
+    const sw = this.swatches()[index];
+    if (!sw) return;
+    const hex = cmykToHex(sw.cmyk);
+    this.setStyle(target === "fill" ? { fill: hex, fillCmyk: sw.cmyk } : { stroke: hex, strokeCmyk: sw.cmyk });
+  }
+
   /** Change page size (px), bleed (px) or crop marks. */
   setDocument(patch: { width?: number; height?: number; bleed?: number; cropMarks?: boolean }): void {
     this.pushUndo();
@@ -305,6 +387,7 @@ export class Editor {
     const d = data.doc as Doc;
     d.bleed = Math.max(0, Number(d.bleed) || 0);
     d.cropMarks = !!d.cropMarks;
+    if (!Array.isArray(d.swatches)) d.swatches = JSON.parse(JSON.stringify(DEFAULT_SWATCHES));
     if (!(d.width > 0) || !(d.height > 0)) throw new Error("Invalid page size in project file");
     return d;
   }
@@ -318,7 +401,7 @@ export class Editor {
   }
 
   private afterHistory(): void {
-    const ids = new Set(this.doc.shapes.map((s) => s.id));
+    const ids = new Set(this.doc.shapes.filter((s) => this.selectable(s)).map((s) => s.id));
     this.selectedIds = this.selectedIds.filter((id) => ids.has(id));
     this.syncBase();
     this.render();
@@ -462,6 +545,7 @@ export class Editor {
       d.cur = p;
       const r = this.marqueeBox(d);
       const hit = this.doc.shapes.filter((s) => {
+        if (!this.selectable(s)) return false;
         const b = bounds(s);
         return b.x <= r.x + r.w && b.x + b.w >= r.x && b.y <= r.y + r.h && b.y + b.h >= r.y;
       });

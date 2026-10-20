@@ -77,6 +77,22 @@
           <div class="cmyk-legend"><span>C</span><span>M</span><span>Y</span><span>K</span></div>
         </section>
 
+        <section>
+          <h3>Swatches</h3>
+          <div class="apply-to">
+            <label><input type="radio" name="apply" value="fill" checked /> Fill</label>
+            <label><input type="radio" name="apply" value="stroke" /> Stroke</label>
+          </div>
+          <div id="swatches"></div>
+          <button id="btn-add-swatch" title="Save the colour in the CMYK boxes above as a swatch">+ Add current colour</button>
+          <div class="hint">Right-click a swatch to delete it.</div>
+        </section>
+
+        <section>
+          <h3>Preflight <span id="pf-badge" class="badge"></span></h3>
+          <ul id="preflight"></ul>
+        </section>
+
         <section id="layers">
           <h3>Layers</h3>
           <div class="layer-actions">

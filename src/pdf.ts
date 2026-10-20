@@ -109,7 +109,7 @@ export function docToPdf(doc: Doc): string {
 
   let content = `q\n${n(PT, 4)} 0 0 ${n(-PT, 4)} ${n(m)} ${n(pageH - m)} cm\n`;
   content += `q\n${n(-bleed)} ${n(-bleed)} ${n(W + 2 * bleed)} ${n(H + 2 * bleed)} re W n\n`;
-  for (const s of doc.shapes) content += shapeStream(s);
+  for (const s of doc.shapes) if (!s.hidden) content += shapeStream(s);
   content += "Q\n";
   if (marks) content += cropMarks(W, H, bleed);
   content += "Q\n";
