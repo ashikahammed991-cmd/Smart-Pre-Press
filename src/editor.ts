@@ -17,13 +17,37 @@ import {
 
 export type ToolName = "select" | "rect" | "ellipse" | "line" | "pen";
 
+type HandleId = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
+
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 type Drag =
   | { type: "move"; last: Pt; moved: boolean }
   | { type: "draw"; start: Pt; shape: Shape }
   | { type: "handle"; node: Node }
+  | { type: "resize"; handle: HandleId; orig: Shape; ob: Box; moved: boolean }
+  | { type: "pan"; last: Pt }
   | null;
 
 const CLOSE_DIST = 10;
+const MIN_ZOOM = 0.05;
+const MAX_ZOOM = 32;
+
+const HANDLE_CURSORS: Record<HandleId, string> = {
+  nw: "nwse-resize",
+  se: "nwse-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  n: "ns-resize",
+  s: "ns-resize",
+  e: "ew-resize",
+  w: "ew-resize",
+};
 
 export class Editor {
   doc: Doc = newDoc();
@@ -40,14 +64,70 @@ export class Editor {
   private drag: Drag = null;
   private penNodes: Node[] = [];
   private hover: Pt | null = null;
+  private clip: Shape | null = null;
+  private spaceDown = false;
+
+  private readonly baseView: Box = { x: -100, y: -100, w: 1200, h: 900 };
+  private view: Box = { ...this.baseView };
 
   constructor(private svg: SVGSVGElement) {
     svg.addEventListener("pointerdown", (e) => this.onDown(e));
     svg.addEventListener("pointermove", (e) => this.onMove(e));
     svg.addEventListener("pointerup", (e) => this.onUp(e));
     svg.addEventListener("dblclick", () => this.finishPen(false));
+    svg.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        this.zoomAt(e.deltaY < 0 ? 1.1 : 1 / 1.1, this.pt(e));
+      },
+      { passive: false },
+    );
     window.addEventListener("keydown", (e) => this.onKey(e));
+    window.addEventListener("keyup", (e) => this.onKeyUp(e));
     this.render();
+  }
+
+  // ---------- view (zoom / pan) ----------
+
+  zoomPercent(): number {
+    return Math.round((this.baseView.w / this.view.w) * 100);
+  }
+
+  zoomAt(factor: number, center: Pt): void {
+    const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, (this.baseView.w / this.view.w) * factor));
+    const newW = this.baseView.w / zoom;
+    const k = newW / this.view.w;
+    this.view = {
+      x: center.x - (center.x - this.view.x) * k,
+      y: center.y - (center.y - this.view.y) * k,
+      w: newW,
+      h: this.view.h * k,
+    };
+    this.render();
+  }
+
+  zoomIn(): void {
+    this.zoomAt(1.25, { x: this.view.x + this.view.w / 2, y: this.view.y + this.view.h / 2 });
+  }
+
+  zoomOut(): void {
+    this.zoomAt(0.8, { x: this.view.x + this.view.w / 2, y: this.view.y + this.view.h / 2 });
+  }
+
+  zoomReset(): void {
+    this.view = { ...this.baseView };
+    this.render();
+  }
+
+  /** Size of one screen pixel in drawing units (keeps handles a constant size on screen). */
+  private px(): number {
+    const m = this.svg.getScreenCTM();
+    return m && m.a > 0 ? 1 / m.a : 1;
+  }
+
+  private updateCursor(): void {
+    this.svg.style.cursor = this.spaceDown ? "grab" : this.tool === "select" ? "default" : "crosshair";
   }
 
   // ---------- public API ----------
@@ -56,7 +136,7 @@ export class Editor {
     if (this.tool === "pen" && t !== "pen") this.finishPen(false);
     this.tool = t;
     if (t !== "select") this.selectedId = null;
-    this.svg.style.cursor = t === "select" ? "default" : "crosshair";
+    this.updateCursor();
     this.onStatus(`Tool: ${t}`);
     this.render();
   }
@@ -98,6 +178,30 @@ export class Editor {
     const arr = this.doc.shapes;
     [arr[i], arr[j]] = [arr[j], arr[i]];
     this.render();
+  }
+
+  copy(): void {
+    const s = this.selected();
+    if (!s) return;
+    this.clip = JSON.parse(JSON.stringify(s));
+    this.onStatus("Copied");
+  }
+
+  paste(): void {
+    if (!this.clip) return;
+    const s = JSON.parse(JSON.stringify(this.clip)) as Shape;
+    s.id = newId();
+    translate(s, 20, 20);
+    this.clip = JSON.parse(JSON.stringify(s)); // repeated pastes cascade
+    this.pushUndo();
+    this.doc.shapes.push(s);
+    this.selectedId = s.id;
+    this.render();
+  }
+
+  duplicate(): void {
+    this.copy();
+    this.paste();
   }
 
   undo(): void {
@@ -154,7 +258,7 @@ export class Editor {
 
   // ---------- input ----------
 
-  private pt(e: PointerEvent): Pt {
+  private pt(e: PointerEvent | WheelEvent): Pt {
     const p = this.svg.createSVGPoint();
     p.x = e.clientX;
     p.y = e.clientY;
@@ -164,13 +268,36 @@ export class Editor {
   }
 
   private onDown(e: PointerEvent): void {
+    // Pan: middle mouse button, or hold Space and drag.
+    if (e.button === 1 || (e.button === 0 && this.spaceDown)) {
+      e.preventDefault();
+      this.svg.setPointerCapture(e.pointerId);
+      this.drag = { type: "pan", last: { x: e.clientX, y: e.clientY } };
+      this.svg.style.cursor = "grabbing";
+      return;
+    }
     if (e.button !== 0) return;
+
     const p = this.pt(e);
     this.svg.setPointerCapture(e.pointerId);
 
     switch (this.tool) {
       case "select": {
-        const el = (e.target as Element).closest("[data-id]");
+        const target = e.target as Element;
+        const handleEl = target.closest("[data-handle]");
+        const sel = this.selected();
+        if (handleEl && sel) {
+          this.pushUndo();
+          this.drag = {
+            type: "resize",
+            handle: handleEl.getAttribute("data-handle") as HandleId,
+            orig: JSON.parse(JSON.stringify(sel)),
+            ob: bounds(sel),
+            moved: false,
+          };
+          break;
+        }
+        const el = target.closest("[data-id]");
         const id = el?.getAttribute("data-id") ?? null;
         this.selectedId = id;
         if (id) {
@@ -196,7 +323,7 @@ export class Editor {
       }
       case "pen": {
         const first = this.penNodes[0];
-        if (first && this.penNodes.length >= 3 && Math.hypot(p.x - first.p.x, p.y - first.p.y) < CLOSE_DIST) {
+        if (first && this.penNodes.length >= 3 && Math.hypot(p.x - first.p.x, p.y - first.p.y) < CLOSE_DIST * this.px()) {
           this.finishPen(true);
           break;
         }
@@ -210,9 +337,20 @@ export class Editor {
   }
 
   private onMove(e: PointerEvent): void {
+    const d = this.drag;
+
+    if (d?.type === "pan") {
+      const m = this.svg.getScreenCTM();
+      const s = m && m.a > 0 ? m.a : 1;
+      this.view.x -= (e.clientX - d.last.x) / s;
+      this.view.y -= (e.clientY - d.last.y) / s;
+      d.last = { x: e.clientX, y: e.clientY };
+      this.render();
+      return;
+    }
+
     const p = this.pt(e);
     this.hover = p;
-    const d = this.drag;
 
     if (d?.type === "move") {
       const s = this.selected();
@@ -221,6 +359,8 @@ export class Editor {
         d.last = p;
         d.moved = true;
       }
+    } else if (d?.type === "resize") {
+      this.doResize(d, p, e.shiftKey);
     } else if (d?.type === "draw") {
       const s = d.shape;
       const { start } = d;
@@ -252,7 +392,9 @@ export class Editor {
     if (this.svg.hasPointerCapture(e.pointerId)) this.svg.releasePointerCapture(e.pointerId);
     const d = this.drag;
     this.drag = null;
-    if (d?.type === "draw") {
+    if (d?.type === "pan") {
+      this.updateCursor();
+    } else if (d?.type === "draw") {
       const b = bounds(d.shape);
       // Discard accidental clicks that produced an empty shape.
       if (b.w < 2 && b.h < 2) {
@@ -261,7 +403,7 @@ export class Editor {
       } else {
         this.selectedId = d.shape.id;
       }
-    } else if (d?.type === "move" && !d.moved) {
+    } else if ((d?.type === "move" || d?.type === "resize") && !d.moved) {
       this.undoStack.pop(); // a plain click is not an edit
     }
     this.render();
@@ -271,26 +413,75 @@ export class Editor {
     const target = e.target as HTMLElement;
     if (target.tagName === "INPUT") return;
     const mod = e.ctrlKey || e.metaKey;
+    const key = e.key.toLowerCase();
 
-    if (mod && e.key.toLowerCase() === "z") {
-      e.preventDefault();
-      e.shiftKey ? this.redo() : this.undo();
+    if (mod) {
+      switch (key) {
+        case "z":
+          e.preventDefault();
+          e.shiftKey ? this.redo() : this.undo();
+          return;
+        case "y":
+          e.preventDefault();
+          this.redo();
+          return;
+        case "c":
+          e.preventDefault();
+          this.copy();
+          return;
+        case "v":
+          e.preventDefault();
+          this.paste();
+          return;
+        case "d":
+          e.preventDefault();
+          this.duplicate();
+          return;
+        case "0":
+          e.preventDefault();
+          this.zoomReset();
+          return;
+        case "=":
+        case "+":
+          e.preventDefault();
+          this.zoomIn();
+          return;
+        case "-":
+          e.preventDefault();
+          this.zoomOut();
+          return;
+      }
+      return; // other shortcuts (save/open/export) are handled in main.ts
+    }
+
+    if (e.key === " ") {
+      e.preventDefault(); // also stops Space from "clicking" a focused button
+      if (!this.spaceDown) {
+        this.spaceDown = true;
+        this.updateCursor();
+      }
       return;
     }
-    if (mod && e.key.toLowerCase() === "y") {
-      e.preventDefault();
-      this.redo();
-      return;
-    }
-    if (mod) return; // other shortcuts (save/open/export) are handled in main.ts
 
     const tools: Record<string, ToolName> = { v: "select", r: "rect", e: "ellipse", l: "line", p: "pen" };
-    const t = tools[e.key.toLowerCase()];
+    const t = tools[key];
     if (t) {
       this.setTool(t);
       this.onChange();
       return;
     }
+
+    if (e.key.startsWith("Arrow") && this.selected()) {
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+      const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+      const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+      this.pushUndo();
+      translate(this.selected()!, dx, dy);
+      this.render();
+      return;
+    }
+
     if (e.key === "Delete" || e.key === "Backspace") this.deleteSelected();
     else if (e.key === "Enter") this.finishPen(false);
     else if (e.key === "Escape") {
@@ -300,13 +491,85 @@ export class Editor {
     }
   }
 
+  private onKeyUp(e: KeyboardEvent): void {
+    if (e.key !== " ") return;
+    if ((e.target as HTMLElement).tagName === "INPUT") return;
+    e.preventDefault();
+    this.spaceDown = false;
+    if (this.drag?.type !== "pan") this.updateCursor();
+  }
+
+  // ---------- resize ----------
+
+  private doResize(d: Extract<Drag, { type: "resize" }>, p: Pt, keepRatio: boolean): void {
+    const { handle, orig, ob } = d;
+    const movesW = handle.includes("w");
+    const movesE = handle.includes("e");
+    const movesN = handle.includes("n");
+    const movesS = handle.includes("s");
+
+    // The edge being dragged, and the opposite edge that stays put (the anchor).
+    const hx = movesW ? ob.x : movesE ? ob.x + ob.w : null;
+    const hy = movesN ? ob.y : movesS ? ob.y + ob.h : null;
+    const ax = movesW ? ob.x + ob.w : ob.x;
+    const ay = movesN ? ob.y + ob.h : ob.y;
+
+    let sx = 1;
+    let sy = 1;
+    if (hx !== null && Math.abs(hx - ax) > 0.001) sx = (p.x - ax) / (hx - ax);
+    if (hy !== null && Math.abs(hy - ay) > 0.001) sy = (p.y - ay) / (hy - ay);
+
+    if (keepRatio && hx !== null && hy !== null) {
+      const s = Math.max(Math.abs(sx), Math.abs(sy));
+      sx = (sx < 0 ? -1 : 1) * s;
+      sy = (sy < 0 ? -1 : 1) * s;
+    }
+    if (Math.abs(sx) < 0.01) sx = sx < 0 ? -0.01 : 0.01;
+    if (Math.abs(sy) < 0.01) sy = sy < 0 ? -0.01 : 0.01;
+
+    const i = this.doc.shapes.findIndex((s) => s.id === orig.id);
+    if (i < 0) return;
+    this.doc.shapes[i] = this.scaled(orig, ax, ay, sx, sy);
+    d.moved = true;
+  }
+
+  /** Scale a copy of `o` around the anchor (ax, ay). Negative factors mirror the shape. */
+  private scaled(o: Shape, ax: number, ay: number, sx: number, sy: number): Shape {
+    const f = (x: number, y: number): Pt => ({ x: ax + (x - ax) * sx, y: ay + (y - ay) * sy });
+    switch (o.kind) {
+      case "rect": {
+        const a = f(o.x, o.y);
+        const b = f(o.x + o.w, o.y + o.h);
+        return { ...o, x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+      }
+      case "ellipse": {
+        const c = f(o.cx, o.cy);
+        return { ...o, cx: c.x, cy: c.y, rx: o.rx * Math.abs(sx), ry: o.ry * Math.abs(sy) };
+      }
+      case "line": {
+        const a = f(o.x1, o.y1);
+        const b = f(o.x2, o.y2);
+        return { ...o, x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+      }
+      case "path":
+        return {
+          ...o,
+          nodes: o.nodes.map((n) => ({
+            p: f(n.p.x, n.p.y),
+            inH: { x: n.inH.x * sx, y: n.inH.y * sy },
+            outH: { x: n.outH.x * sx, y: n.outH.y * sy },
+          })),
+        };
+    }
+  }
+
   private finishPen(closed: boolean): void {
     if (this.tool !== "pen") return;
     // A double-click adds a duplicate final anchor; drop it.
     if (!closed && this.penNodes.length >= 2) {
       const a = this.penNodes[this.penNodes.length - 1].p;
       const b = this.penNodes[this.penNodes.length - 2].p;
-      if (Math.hypot(a.x - b.x, a.y - b.y) < 2) this.penNodes.pop();
+      if (Math.hypot(a.x - b.x, a.y - b.y) < 2 * this.px()) this.penNodes.pop();
     }
     if (this.penNodes.length >= 2) {
       const shape: PathShape = { id: newId(), kind: "path", nodes: this.penNodes, closed, ...this.style };
@@ -322,6 +585,9 @@ export class Editor {
   // ---------- rendering ----------
 
   render(): void {
+    this.svg.setAttribute("viewBox", `${this.view.x} ${this.view.y} ${this.view.w} ${this.view.h}`);
+    const px = this.px();
+
     const parts: string[] = [];
     parts.push(
       `<rect x="0" y="0" width="${ARTBOARD.width}" height="${ARTBOARD.height}" fill="#ffffff" stroke="#3a3f4b" stroke-width="1" vector-effect="non-scaling-stroke"/>`,
@@ -332,8 +598,25 @@ export class Editor {
     if (sel) {
       const b = bounds(sel);
       parts.push(
-        `<rect x="${b.x - 3}" y="${b.y - 3}" width="${b.w + 6}" height="${b.h + 6}" fill="none" stroke="#2f7cf6" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`,
+        `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="none" stroke="#2f7cf6" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`,
       );
+      const half = 4 * px;
+      const pos: Record<HandleId, [number, number]> = {
+        nw: [b.x, b.y],
+        n: [b.x + b.w / 2, b.y],
+        ne: [b.x + b.w, b.y],
+        e: [b.x + b.w, b.y + b.h / 2],
+        se: [b.x + b.w, b.y + b.h],
+        s: [b.x + b.w / 2, b.y + b.h],
+        sw: [b.x, b.y + b.h],
+        w: [b.x, b.y + b.h / 2],
+      };
+      for (const id of Object.keys(pos) as HandleId[]) {
+        const [hx, hy] = pos[id];
+        parts.push(
+          `<rect data-handle="${id}" x="${hx - half}" y="${hy - half}" width="${half * 2}" height="${half * 2}" fill="#ffffff" stroke="#2f7cf6" stroke-width="1" vector-effect="non-scaling-stroke" style="cursor:${HANDLE_CURSORS[id]}"/>`,
+        );
+      }
     }
 
     if (this.tool === "pen" && this.penNodes.length > 0) {
@@ -342,9 +625,10 @@ export class Editor {
       parts.push(
         `<path d="${pathData(preview, false)}" fill="none" stroke="#2f7cf6" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`,
       );
+      const half = 3 * px;
       for (const n of this.penNodes) {
         parts.push(
-          `<rect x="${n.p.x - 3}" y="${n.p.y - 3}" width="6" height="6" fill="#fff" stroke="#2f7cf6" pointer-events="none"/>`,
+          `<rect x="${n.p.x - half}" y="${n.p.y - half}" width="${half * 2}" height="${half * 2}" fill="#fff" stroke="#2f7cf6" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`,
         );
         if (n.outH.x || n.outH.y) {
           parts.push(

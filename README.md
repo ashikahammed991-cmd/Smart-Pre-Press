@@ -10,6 +10,9 @@ Draw shapes, build curves with the pen tool, organise layers, and export clean S
 - Rectangle, ellipse, line and pen (bezier) tools
 - Select, move, delete, bring forward / send backward
 - Fill, stroke colour and stroke width
+- Resize handles (hold Shift on a corner to keep proportions)
+- Zoom (mouse wheel) and pan (Space + drag, or middle mouse button)
+- Copy, paste, duplicate, arrow-key nudging
 - Undo / redo
 - Save and open projects (`.spp`), export SVG
 - Runs on Windows, macOS and Linux
@@ -22,6 +25,11 @@ Draw shapes, build curves with the pen tool, organise layers, and export clean S
 | Enter or double-click | Finish an open pen path |
 | Click first point | Close the pen path |
 | Del | Delete selection |
+| Ctrl+C / Ctrl+V / Ctrl+D | Copy / paste / duplicate |
+| Arrow keys (Shift = 10x) | Nudge selection |
+| Mouse wheel | Zoom at the cursor |
+| Space + drag | Pan |
+| Ctrl+0 / Ctrl++ / Ctrl+- | Reset / zoom in / zoom out |
 | Ctrl+Z / Ctrl+Shift+Z | Undo / redo |
 | Ctrl+S / Ctrl+O / Ctrl+E | Save / open / export SVG |
 

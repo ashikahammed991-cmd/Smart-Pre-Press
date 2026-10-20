@@ -32,6 +32,7 @@ let lastSelectedForProps: string | null = null;
 
 function refreshUi(): void {
   toolButtons.forEach((b) => b.classList.toggle("active", b.dataset.tool === editor.tool));
+  $("btn-zoom-reset").textContent = `${editor.zoomPercent()}%`;
 
   layerList.innerHTML = "";
   [...editor.doc.shapes].reverse().forEach((s, i) => {
@@ -70,6 +71,10 @@ refreshUi();
 $("btn-undo").addEventListener("click", () => editor.undo());
 $("btn-redo").addEventListener("click", () => editor.redo());
 $("btn-delete").addEventListener("click", () => editor.deleteSelected());
+$("btn-duplicate").addEventListener("click", () => editor.duplicate());
+$("btn-zoom-in").addEventListener("click", () => editor.zoomIn());
+$("btn-zoom-out").addEventListener("click", () => editor.zoomOut());
+$("btn-zoom-reset").addEventListener("click", () => editor.zoomReset());
 $("btn-forward").addEventListener("click", () => editor.reorder(1));
 $("btn-backward").addEventListener("click", () => editor.reorder(-1));
 

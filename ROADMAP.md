@@ -14,11 +14,13 @@ A full professional editor is built in stages; each stage ships as a GitHub Rele
 - [x] Windows / macOS / Linux builds through GitHub Actions
 
 ## v0.2 - editing precision
-- [ ] Zoom and pan (wheel, space+drag)
-- [ ] Resize and rotate handles, multi-select, marquee select
+- [x] Zoom and pan (wheel, space+drag)
+- [x] Resize handles
+- [ ] Rotate handles, multi-select, marquee select
 - [ ] Direct selection: move anchors and handles of existing paths
 - [ ] Snapping, guides, rulers, grid
-- [ ] Copy / paste / duplicate, group / ungroup
+- [x] Copy / paste / duplicate
+- [ ] Group / ungroup
 
 ## v0.3 - layers and appearance
 - [ ] Real layers panel: names, visibility, lock, nesting
