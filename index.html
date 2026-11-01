@@ -91,10 +91,34 @@
         </section>
 
         <section>
+          <h3>Gradient fill</h3>
+          <div class="row2">
+            <label>Type
+              <select id="g-type">
+                <option value="none">Solid</option>
+                <option value="linear">Linear</option>
+                <option value="radial">Radial</option>
+              </select>
+            </label>
+            <label>Angle <input type="number" id="g-angle" min="-360" max="360" step="5" value="0" /></label>
+          </div>
+          <div class="cmyk-row"><span>Start</span>
+            <input type="number" id="g0c" min="0" max="100" title="Cyan" /><input type="number" id="g0m" min="0" max="100" title="Magenta" /><input type="number" id="g0y" min="0" max="100" title="Yellow" /><input type="number" id="g0k" min="0" max="100" title="Black" />
+          </div>
+          <div class="cmyk-row"><span>End</span>
+            <input type="number" id="g1c" min="0" max="100" title="Cyan" /><input type="number" id="g1m" min="0" max="100" title="Magenta" /><input type="number" id="g1y" min="0" max="100" title="Yellow" /><input type="number" id="g1k" min="0" max="100" title="Black" />
+          </div>
+          <div class="cmyk-legend"><span>C</span><span>M</span><span>Y</span><span>K</span></div>
+          <div class="hint">Pick a shape, choose Linear or Radial. Pick G1/G2 under Swatches to set a stop from a swatch. Angle 0 = left to right.</div>
+        </section>
+
+        <section>
           <h3>Swatches</h3>
           <div class="apply-to">
             <label><input type="radio" name="apply" value="fill" checked /> Fill</label>
             <label><input type="radio" name="apply" value="stroke" /> Stroke</label>
+            <label title="Gradient start colour"><input type="radio" name="apply" value="g0" /> G1</label>
+            <label title="Gradient end colour"><input type="radio" name="apply" value="g1" /> G2</label>
           </div>
           <div id="swatches"></div>
           <button id="btn-add-swatch" title="Save the colour in the CMYK boxes above as a swatch">+ Add current colour</button>

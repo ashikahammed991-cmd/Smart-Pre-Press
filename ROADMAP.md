@@ -52,7 +52,11 @@ A full professional editor is built in stages; each stage ships as a GitHub Rele
 - [ ] Vector outlines for text in the PDF (shaping engine, e.g. Rust rustybuzz)
 - [ ] Alignment, paragraph/area text, text on path
 
-## v0.7 - import and gradients
+## v0.7 - gradients (done)
+- [x] Linear and radial gradient fills (CMYK stops, angle), SVG and PDF (real PDF shadings)
+- [ ] Gradient with more than two stops in the UI (the file format and PDF already support it)
+
+## v0.8 - import
 - [ ] Import SVG and raster images
 - [ ] Export PNG at chosen resolution
 

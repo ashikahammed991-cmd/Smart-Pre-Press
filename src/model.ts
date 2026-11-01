@@ -1,3 +1,4 @@
+import { cmykToHex } from "./color";
 import type { Cmyk } from "./color";
 
 export interface Pt {
@@ -5,7 +6,22 @@ export interface Pt {
   y: number;
 }
 
+export interface GradientStop {
+  /** Position along the gradient, 0..1. */
+  offset: number;
+  cmyk: Cmyk;
+}
+
+/** A linear (angle in degrees, 0 = left to right, 90 = top to bottom) or radial fill. */
+export interface Gradient {
+  type: "linear" | "radial";
+  angle: number;
+  stops: GradientStop[];
+}
+
 export interface Style {
+  /** When set, replaces the flat fill (`fill` / `fillCmyk` hold the first stop as a fallback). */
+  fillGradient?: Gradient;
   fill: string;
   stroke: string;
   strokeWidth: number;
@@ -87,6 +103,47 @@ export function familyCss(name: string): string {
   if (!n) return "sans-serif";
   if (/^(serif|sans-serif|monospace|cursive|fantasy|system-ui)$/i.test(n)) return n;
   return `"${n}", sans-serif`;
+}
+
+/** Sorted stops that cover 0..1 with strictly increasing offsets (what both SVG and PDF are fed). */
+export function gradientStops(g: Gradient): GradientStop[] {
+  const st = [...g.stops].sort((a, b) => a.offset - b.offset).map((s) => ({ offset: Math.min(1, Math.max(0, s.offset)), cmyk: s.cmyk }));
+  if (st.length === 0) return [{ offset: 0, cmyk: [0, 0, 0, 1] }, { offset: 1, cmyk: [0, 0, 0, 1] }];
+  if (st[0].offset > 0) st.unshift({ offset: 0, cmyk: st[0].cmyk });
+  if (st[st.length - 1].offset < 1) st.push({ offset: 1, cmyk: st[st.length - 1].cmyk });
+  for (let i = 1; i < st.length; i++) if (st[i].offset <= st[i - 1].offset) st[i].offset = Math.min(1, st[i - 1].offset + 0.0001);
+  return st;
+}
+
+export type GradientGeom = { x1: number; y1: number; x2: number; y2: number } | { cx: number; cy: number; r: number };
+
+/** Gradient line (linear) or circle (radial) for a shape's bounds, in the shape's own user space. */
+export function gradientGeom(g: Gradient, b: { x: number; y: number; w: number; h: number }): GradientGeom {
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  if (g.type === "radial") return { cx, cy, r: Math.max(b.w, b.h) / 2 || 1 };
+  const a = (g.angle * Math.PI) / 180;
+  const dx = Math.cos(a);
+  const dy = Math.sin(a);
+  const L = (Math.abs(b.w * dx) + Math.abs(b.h * dy)) / 2 || 1;
+  return { x1: cx - dx * L, y1: cy - dy * L, x2: cx + dx * L, y2: cy + dy * L };
+}
+
+/** True when the shape is drawn with its gradient (closed shapes other than text). */
+export function hasGradientFill(s: Shape): s is Shape & { fillGradient: Gradient } {
+  return !!s.fillGradient && (s.kind === "rect" || s.kind === "ellipse" || (s.kind === "path" && s.closed));
+}
+
+function gradientDef(s: Shape & { fillGradient: Gradient }): string {
+  const g = s.fillGradient;
+  const geom = gradientGeom(g, bounds(s));
+  const f = (v: number) => +v.toFixed(3);
+  const stops = gradientStops(g)
+    .map((st) => `<stop offset="${f(st.offset)}" stop-color="${cmykToHex(st.cmyk)}"/>`)
+    .join("");
+  const id = `gr-${s.id}`;
+  if ("r" in geom) return `<defs><radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${f(geom.cx)}" cy="${f(geom.cy)}" r="${f(geom.r)}">${stops}</radialGradient></defs>`;
+  return `<defs><linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${f(geom.x1)}" y1="${f(geom.y1)}" x2="${f(geom.x2)}" y2="${f(geom.y2)}">${stops}</linearGradient></defs>`;
 }
 
 export interface Swatch {
@@ -232,17 +289,18 @@ export function shapeToSvg(s: Shape, withId = false): string {
   if (s.hidden) return "";
   // On the canvas a locked shape is drawn but cannot be clicked.
   const idAttr = (withId ? (s.locked ? ' pointer-events="none"' : ` data-id="${esc(s.id)}"`) : "") + rotAttr(s);
-  const style = `fill="${esc(s.fill)}" stroke="${esc(s.stroke)}" stroke-width="${s.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"`;
+  const grad = hasGradientFill(s);
+  const style = `fill="${grad ? `url(#gr-${esc(s.id)})` : esc(s.fill)}" stroke="${esc(s.stroke)}" stroke-width="${s.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"`;
   switch (s.kind) {
     case "rect":
-      return `<rect${idAttr} x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" ${style}/>`;
+      return `${grad ? gradientDef(s as Shape & { fillGradient: Gradient }) : ""}<rect${idAttr} x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" ${style}/>`;
     case "ellipse":
-      return `<ellipse${idAttr} cx="${s.cx}" cy="${s.cy}" rx="${s.rx}" ry="${s.ry}" ${style}/>`;
+      return `${grad ? gradientDef(s as Shape & { fillGradient: Gradient }) : ""}<ellipse${idAttr} cx="${s.cx}" cy="${s.cy}" rx="${s.rx}" ry="${s.ry}" ${style}/>`;
     case "line":
       // A line has no fill; fall back to the stroke colour.
       return `<line${idAttr} x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${esc(s.stroke)}" stroke-width="${Math.max(s.strokeWidth, 1)}" stroke-linecap="round"/>`;
     case "path":
-      return `<path${idAttr} d="${pathData(s.nodes, s.closed)}" ${style}${s.closed ? "" : ' fill="none"'}/>`;
+      return `${grad ? gradientDef(s as Shape & { fillGradient: Gradient }) : ""}<path${idAttr} d="${pathData(s.nodes, s.closed)}" ${style}${s.closed ? "" : ' fill="none"'}/>`;
     case "text": {
       const f = (n: number) => +n.toFixed(2);
       const spans = s.text

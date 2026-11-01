@@ -2,6 +2,7 @@ import { Cmyk, cmykToHex } from "./color";
 import {
   DEFAULT_SWATCHES,
   Doc,
+  Gradient,
   Node,
   PathShape,
   Pt,
@@ -241,6 +242,21 @@ export class Editor {
     }
   }
 
+  /** Set (or with null, remove) the gradient fill of the selection and of new shapes. */
+  setGradient(g: Gradient | null): void {
+    if (!g) {
+      this.setStyle({ fillGradient: undefined });
+      return;
+    }
+    const first = g.stops[0]?.cmyk ?? [0, 0, 0, 1];
+    this.setStyle({ fillGradient: JSON.parse(JSON.stringify(g)), fill: cmykToHex(first), fillCmyk: first });
+  }
+
+  /** The gradient of the first selected shape, or of the current style when nothing is selected. */
+  currentGradient(): Gradient | undefined {
+    return this.selected()?.fillGradient ?? (this.selectedIds.length ? undefined : this.style.fillGradient);
+  }
+
   /** The selected shape if it is text (to mirror its font into the Text panel). */
   selectedText(): TextShape | undefined {
     const s = this.selected();
@@ -276,6 +292,7 @@ export class Editor {
       y: p.y,
       text: "",
       ...this.style,
+      fillGradient: undefined,
       strokeWidth: 0,
       ...this.textStyle,
       ...measureText(" ", this.textStyle),
@@ -521,7 +538,7 @@ export class Editor {
     const sw = this.swatches()[index];
     if (!sw) return;
     const hex = cmykToHex(sw.cmyk);
-    this.setStyle(target === "fill" ? { fill: hex, fillCmyk: sw.cmyk } : { stroke: hex, strokeCmyk: sw.cmyk });
+    this.setStyle(target === "fill" ? { fill: hex, fillCmyk: sw.cmyk, fillGradient: undefined } : { stroke: hex, strokeCmyk: sw.cmyk });
   }
 
   /** Change page size (px), bleed (px) or crop marks. */

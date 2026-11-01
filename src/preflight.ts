@@ -70,11 +70,15 @@ export function preflight(doc: Doc): Issue[] {
     const usesFill = closedFill;
     const usesStroke = s.kind !== "text" && (s.strokeWidth > 0 || s.kind === "line");
 
-    if (usesFill && !s.fillCmyk) rgbOnly++;
+    if (usesFill && !s.fillCmyk && !s.fillGradient) rgbOnly++;
     else if (usesStroke && !s.strokeCmyk) rgbOnly++;
 
     const ink = (c: number[]) => (c[0] + c[1] + c[2] + c[3]) * 100;
-    const fillInk = usesFill ? ink(s.fillCmyk ?? hexToCmyk(s.fill)) : 0;
+    const fillInk = usesFill
+      ? s.fillGradient && s.kind !== "text"
+        ? Math.max(...s.fillGradient.stops.map((st) => ink(st.cmyk)))
+        : ink(s.fillCmyk ?? hexToCmyk(s.fill))
+      : 0;
     const strokeInk = usesStroke ? ink(s.strokeCmyk ?? hexToCmyk(s.stroke)) : 0;
     if (Math.max(fillInk, strokeInk) > 300.5) highInk.push(label(s, i));
 

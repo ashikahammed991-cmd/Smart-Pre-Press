@@ -2,7 +2,7 @@ import "./style.css";
 import { Editor, ToolName } from "./editor";
 import { openText, saveBytes, saveText } from "./io";
 import { Cmyk, clampCmyk, cmykToHex, hexToCmyk } from "./color";
-import { mmToPx, pxToMm } from "./model";
+import { Gradient, mmToPx, pxToMm } from "./model";
 import { docToPdf, pdfBytes } from "./pdf";
 import { preflight } from "./preflight";
 import { listFonts } from "./text";
@@ -40,7 +40,7 @@ function readCmyk(prefix: "f" | "s"): Cmyk {
 }
 
 fill.addEventListener("input", () => {
-  editor.setStyle({ fill: fill.value, fillCmyk: undefined });
+  editor.setStyle({ fill: fill.value, fillCmyk: undefined, fillGradient: undefined });
   setCmykInputs("f", hexToCmyk(fill.value));
 });
 stroke.addEventListener("input", () => {
@@ -56,7 +56,7 @@ strokeWidth.addEventListener("input", () => editor.setStyle({ strokeWidth: Numbe
       const hex = cmykToHex(c);
       if (prefix === "f") {
         fill.value = hex;
-        editor.setStyle({ fill: hex, fillCmyk: c });
+        editor.setStyle({ fill: hex, fillCmyk: c, fillGradient: undefined });
       } else {
         stroke.value = hex;
         editor.setStyle({ stroke: hex, strokeCmyk: c });
@@ -116,6 +116,60 @@ tSize.addEventListener("input", () => {
 tBold.addEventListener("click", () => editor.setTextProps({ bold: !(editor.selectedText() ?? editor.textStyle).bold }));
 tItalic.addEventListener("click", () => editor.setTextProps({ italic: !(editor.selectedText() ?? editor.textStyle).italic }));
 
+// ---------- gradient panel ----------
+const gType = $<HTMLSelectElement>("g-type");
+const gAngle = input("g-angle");
+const gIds = (i: 0 | 1) => CH.map((ch) => input(`g${i}${ch}`));
+
+function readStop(i: 0 | 1) {
+  return clampCmyk(gIds(i).map((el) => Number(el.value) / 100));
+}
+function writeStop(i: 0 | 1, c: Cmyk): void {
+  gIds(i).forEach((el, k) => (el.value = String(Math.round(c[k] * 100))));
+}
+function readGradient(): Gradient | null {
+  if (gType.value === "none") return null;
+  return {
+    type: gType.value === "radial" ? "radial" : "linear",
+    angle: Number(gAngle.value) || 0,
+    stops: [
+      { offset: 0, cmyk: readStop(0) },
+      { offset: 1, cmyk: readStop(1) },
+    ],
+  };
+}
+function pushGradient(): void {
+  editor.setGradient(readGradient());
+}
+gType.addEventListener("change", () => {
+  if (gType.value !== "none" && !editor.currentGradient()) {
+    const c = readCmyk("f");
+    writeStop(0, c);
+    writeStop(1, [c[0], c[1], c[2], Math.min(1, c[3] + 0.6)]);
+  }
+  pushGradient();
+});
+gAngle.addEventListener("input", () => gType.value !== "none" && pushGradient());
+for (const i of [0, 1] as const) gIds(i).forEach((el) => el.addEventListener("input", () => gType.value !== "none" && pushGradient()));
+
+let lastGradKey = "";
+function mirrorGradient(): void {
+  const g = editor.currentGradient();
+  const key = JSON.stringify(g ?? null) + (editor.selected()?.id ?? "");
+  if (key === lastGradKey) return;
+  lastGradKey = key;
+  const busy = document.activeElement?.closest("#g-type") || [gAngle, ...gIds(0), ...gIds(1)].includes(document.activeElement as HTMLInputElement);
+  if (busy) return;
+  if (!g) {
+    gType.value = "none";
+    return;
+  }
+  gType.value = g.type;
+  gAngle.value = String(g.angle);
+  if (g.stops[0]) writeStop(0, g.stops[0].cmyk);
+  if (g.stops[g.stops.length - 1]) writeStop(1, g.stops[g.stops.length - 1].cmyk);
+}
+
 // ---------- document settings ----------
 const docW = input("doc-w");
 const docH = input("doc-h");
@@ -162,8 +216,9 @@ docMarks.addEventListener("change", () => editor.setDocument({ cropMarks: docMar
 const swatchBox = $("swatches");
 let swatchKey = "";
 
-function applyTarget(): "fill" | "stroke" {
-  return document.querySelector<HTMLInputElement>('input[name="apply"]:checked')?.value === "stroke" ? "stroke" : "fill";
+function applyTarget(): "fill" | "stroke" | "g0" | "g1" {
+  const v = document.querySelector<HTMLInputElement>('input[name="apply"]:checked')?.value;
+  return v === "stroke" || v === "g0" || v === "g1" ? v : "fill";
 }
 
 function renderSwatches(): void {
@@ -180,6 +235,16 @@ function renderSwatches(): void {
     b.title = `${sw.name}  (C${pct[0]} M${pct[1]} Y${pct[2]} K${pct[3]})`;
     b.addEventListener("click", () => {
       const target = applyTarget();
+      if (target === "g0" || target === "g1") {
+        if (gType.value === "none") {
+          gType.value = "linear";
+          writeStop(0, readCmyk("f"));
+          writeStop(1, readCmyk("f"));
+        }
+        writeStop(target === "g0" ? 0 : 1, sw.cmyk);
+        pushGradient();
+        return;
+      }
       editor.applySwatch(i, target);
       const hex = cmykToHex(sw.cmyk);
       if (target === "fill") {
@@ -197,7 +262,7 @@ function renderSwatches(): void {
     swatchBox.appendChild(b);
   });
 }
-$("btn-add-swatch").addEventListener("click", () => editor.addSwatch(readCmyk(applyTarget() === "fill" ? "f" : "s")));
+$("btn-add-swatch").addEventListener("click", () => editor.addSwatch(applyTarget() === "g0" ? readStop(0) : applyTarget() === "g1" ? readStop(1) : readCmyk(applyTarget() === "fill" ? "f" : "s")));
 
 // ---------- preflight ----------
 const pfList = $("preflight");
@@ -320,6 +385,7 @@ function refreshUi(): void {
   }
 
   mirrorText();
+  mirrorGradient();
 
   // Mirror the selected shape's colours into the property inputs.
   const sel = editor.selected();

@@ -1,6 +1,6 @@
 import { hexToCmyk } from "./color";
 import type { Cmyk } from "./color";
-import { Doc, Shape, center, mmToPx } from "./model";
+import { Doc, Shape, bounds, center, gradientGeom, gradientStops, hasGradientFill, mmToPx } from "./model";
 import { TextMask, deflate, rasterizeText } from "./text";
 
 /**
@@ -25,7 +25,27 @@ const n = (v: number, d = 3): string => {
 const fillOp = (c: Cmyk) => `${c.map((x) => n(x, 4)).join(" ")} k`;
 const strokeOp = (c: Cmyk) => `${c.map((x) => n(x, 4)).join(" ")} K`;
 
-function shapeStream(s: Shape): string {
+/** PDF shading dictionary (axial or radial) for a gradient-filled shape, in the shape's user space. */
+function shadingObject(s: Shape): string {
+  if (!hasGradientFill(s)) return "";
+  const g = s.fillGradient;
+  const st = gradientStops(g);
+  const col = (c: Cmyk) => c.map((x) => n(x, 4)).join(" ");
+  const fn = (a: Cmyk, b: Cmyk) => `<< /FunctionType 2 /Domain [0 1] /C0 [${col(a)}] /C1 [${col(b)}] /N 1 >>`;
+  let func: string;
+  if (st.length === 2) func = fn(st[0].cmyk, st[1].cmyk);
+  else {
+    const parts = st.slice(1).map((x, i) => fn(st[i].cmyk, x.cmyk));
+    const bounds_ = st.slice(1, -1).map((x) => n(x.offset, 5));
+    const encode = parts.map(() => "0 1").join(" ");
+    func = `<< /FunctionType 3 /Domain [0 1] /Functions [${parts.join(" ")}] /Bounds [${bounds_.join(" ")}] /Encode [${encode}] >>`;
+  }
+  const geom = gradientGeom(g, bounds(s));
+  if ("r" in geom) return `<< /ShadingType 3 /ColorSpace /DeviceCMYK /Coords [${n(geom.cx)} ${n(geom.cy)} 0 ${n(geom.cx)} ${n(geom.cy)} ${n(geom.r)}] /Function ${func} /Extend [true true] >>`;
+  return `<< /ShadingType 2 /ColorSpace /DeviceCMYK /Coords [${n(geom.x1)} ${n(geom.y1)} ${n(geom.x2)} ${n(geom.y2)}] /Function ${func} /Extend [true true] >>`;
+}
+
+function shapeStream(s: Shape, shading?: string): string {
   const fillC = s.fillCmyk ?? hexToCmyk(s.fill);
   const strokeC = s.strokeCmyk ?? hexToCmyk(s.stroke);
   let o = "q\n";
@@ -37,6 +57,8 @@ function shapeStream(s: Shape): string {
     const sin = Math.sin(a);
     o += `${n(cos, 6)} ${n(sin, 6)} ${n(-sin, 6)} ${n(cos, 6)} ${n(c.x - c.x * cos + c.y * sin, 4)} ${n(c.y - c.x * sin - c.y * cos, 4)} cm\n`;
   }
+  const head = o;
+  o = "";
 
   let canFill = true;
   let sw = s.strokeWidth;
@@ -81,9 +103,16 @@ function shapeStream(s: Shape): string {
 
   const doStroke = sw > 0;
   const doFill = canFill && closed;
-  o += `${fillOp(fillC)}\n${strokeOp(strokeC)}\n${n(sw)} w\n1 J 1 j\n`;
+  const strokeStyle = `${strokeOp(strokeC)}\n${n(sw)} w\n1 J 1 j\n`;
+  if (shading && doFill) {
+    // Gradient: clip to the outline, paint the shading, then stroke the outline on top.
+    let g = `q\n${o}W n\n/${shading} sh\nQ\n`;
+    if (doStroke) g += `${o}${strokeStyle}S\n`;
+    return head + g + "Q\n";
+  }
+  o += `${fillOp(fillC)}\n${strokeStyle}`;
   o += doFill && doStroke ? "B\n" : doFill ? "f\n" : doStroke ? "S\n" : "n\n";
-  return o + "Q\n";
+  return head + o + "Q\n";
 }
 
 /** Paint a text mask image (name `/Im<n>`) in the text's CMYK colour, honouring rotation. */
@@ -154,6 +183,15 @@ export async function docToPdf(doc: Doc): Promise<string> {
     placed.set(s.id, { x: mask.x, y: mask.y, w: mask.w, h: mask.h });
   }
 
+  // Gradient fills become shading objects (numbered after the images).
+  const shadings: string[] = [];
+  const shadingOf = new Map<string, string>();
+  for (const s of doc.shapes) {
+    if (s.hidden || !hasGradientFill(s)) continue;
+    shadings.push(shadingObject(s));
+    shadingOf.set(s.id, `Sh${shadings.length}`);
+  }
+
   let content = `q\n${n(PT, 4)} 0 0 ${n(-PT, 4)} ${n(m)} ${n(pageH - m)} cm\n`;
   content += `q\n${n(-bleed)} ${n(-bleed)} ${n(W + 2 * bleed)} ${n(H + 2 * bleed)} re W n\n`;
   for (const s of doc.shapes) {
@@ -162,7 +200,7 @@ export async function docToPdf(doc: Doc): Promise<string> {
     const mask = placed.get(s.id);
     if (s.kind === "text") {
       if (name && mask) content += textStream(s, mask, name);
-    } else content += shapeStream(s);
+    } else content += shapeStream(s, shadingOf.get(s.id));
   }
   content += "Q\n";
   if (marks) content += cropMarks(W, H, bleed);
@@ -172,10 +210,11 @@ export async function docToPdf(doc: Doc): Promise<string> {
   const objs: string[] = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    `<< /Type /Page /Parent 2 0 R /MediaBox ${box(0, 0, pageW, pageH)} /TrimBox ${box(m, m, pageW - m, pageH - m)} /BleedBox ${box(m - b, m - b, pageW - m + b, pageH - m + b)} /Contents 4 0 R /Resources << ${images.length ? `/XObject << ${images.map((im, i) => `/${im.name} ${6 + i} 0 R`).join(" ")} >>` : ""} >> >>`,
+    `<< /Type /Page /Parent 2 0 R /MediaBox ${box(0, 0, pageW, pageH)} /TrimBox ${box(m, m, pageW - m, pageH - m)} /BleedBox ${box(m - b, m - b, pageW - m + b, pageH - m + b)} /Contents 4 0 R /Resources << ${images.length ? `/XObject << ${images.map((im, i) => `/${im.name} ${6 + i} 0 R`).join(" ")} >>` : ""}${shadings.length ? ` /Shading << ${shadings.map((_, i) => `/Sh${i + 1} ${6 + images.length + i} 0 R`).join(" ")} >>` : ""} >> >>`,
     `<< /Length ${content.length} >>\nstream\n${content}endstream`,
     "<< /Producer (Smart Pre-Press) /Title (Smart Pre-Press print file) >>",
     ...images.map((im) => im.obj),
+    ...shadings,
   ];
 
   let out = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
