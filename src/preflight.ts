@@ -66,9 +66,9 @@ export function preflight(doc: Doc): Issue[] {
       if (stopsShort(wb.x0, wb.x1, 0, W) || stopsShort(wb.y0, wb.y1, 0, H)) missingBleed.push(label(s, i));
     }
 
-    const closedFill = s.kind === "rect" || s.kind === "ellipse" || (s.kind === "path" && s.closed);
+    const closedFill = s.kind === "rect" || s.kind === "text" || s.kind === "ellipse" || (s.kind === "path" && s.closed);
     const usesFill = closedFill;
-    const usesStroke = s.strokeWidth > 0 || s.kind === "line";
+    const usesStroke = s.kind !== "text" && (s.strokeWidth > 0 || s.kind === "line");
 
     if (usesFill && !s.fillCmyk) rgbOnly++;
     else if (usesStroke && !s.strokeCmyk) rgbOnly++;
@@ -78,7 +78,7 @@ export function preflight(doc: Doc): Issue[] {
     const strokeInk = usesStroke ? ink(s.strokeCmyk ?? hexToCmyk(s.stroke)) : 0;
     if (Math.max(fillInk, strokeInk) > 300.5) highInk.push(label(s, i));
 
-    if (s.kind !== "line" && s.strokeWidth > 0 && s.strokeWidth * PT < 0.25) hairline.push(label(s, i));
+    if (s.kind !== "line" && s.kind !== "text" && s.strokeWidth > 0 && s.strokeWidth * PT < 0.25) hairline.push(label(s, i));
   }
 
   const list = (names: string[]) => (names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", "));
@@ -99,6 +99,13 @@ export function preflight(doc: Doc): Issue[] {
     out.push({
       level: "info",
       text: `${rgbOnly} shape${rgbOnly === 1 ? " uses" : "s use"} RGB colours; ${rgbOnly === 1 ? "it is" : "they are"} converted to CMYK automatically in the PDF. Type CMYK values for exact control.`,
+    });
+  }
+  const texts = visible.filter(({ s }) => s.kind === "text").length;
+  if (texts) {
+    out.push({
+      level: "info",
+      text: `${texts} text object${texts === 1 ? " is" : "s are"} exported to the PDF as 1200 dpi bitmaps (sharp, but not editable vector type).`,
     });
   }
   const hidden = doc.shapes.filter((s) => s.hidden).length;

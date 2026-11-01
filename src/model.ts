@@ -60,7 +60,34 @@ export interface PathShape extends Base {
   closed: boolean;
 }
 
-export type Shape = RectShape | EllipseShape | LineShape | PathShape;
+/** Live text. Box size and line metrics are measured by the browser (see text.ts). */
+export interface TextShape extends Base {
+  kind: "text";
+  /** Top-left of the text box. */
+  x: number;
+  y: number;
+  text: string;
+  fontFamily: string;
+  /** Font size in px (1 px = 0.75 pt). */
+  fontSize: number;
+  bold?: boolean;
+  italic?: boolean;
+  /** Measured box size, distance from the top to the first baseline, and line height. */
+  w: number;
+  h: number;
+  asc: number;
+  lh: number;
+}
+
+export type Shape = RectShape | EllipseShape | LineShape | PathShape | TextShape;
+
+/** CSS font-family value for a user-entered family name. */
+export function familyCss(name: string): string {
+  const n = name.replace(/["\\]/g, "").trim();
+  if (!n) return "sans-serif";
+  if (/^(serif|sans-serif|monospace|cursive|fantasy|system-ui)$/i.test(n)) return n;
+  return `"${n}", sans-serif`;
+}
 
 export interface Swatch {
   name: string;
@@ -125,6 +152,7 @@ export function pathData(nodes: Node[], closed: boolean): string {
 export function translate(s: Shape, dx: number, dy: number): void {
   switch (s.kind) {
     case "rect":
+    case "text":
       s.x += dx;
       s.y += dy;
       break;
@@ -150,6 +178,7 @@ export function translate(s: Shape, dx: number, dy: number): void {
 export function bounds(s: Shape): { x: number; y: number; w: number; h: number } {
   switch (s.kind) {
     case "rect":
+    case "text":
       return { x: s.x, y: s.y, w: s.w, h: s.h };
     case "ellipse":
       return { x: s.cx - s.rx, y: s.cy - s.ry, w: s.rx * 2, h: s.ry * 2 };
@@ -214,6 +243,17 @@ export function shapeToSvg(s: Shape, withId = false): string {
       return `<line${idAttr} x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${esc(s.stroke)}" stroke-width="${Math.max(s.strokeWidth, 1)}" stroke-linecap="round"/>`;
     case "path":
       return `<path${idAttr} d="${pathData(s.nodes, s.closed)}" ${style}${s.closed ? "" : ' fill="none"'}/>`;
+    case "text": {
+      const f = (n: number) => +n.toFixed(2);
+      const spans = s.text
+        .split("\n")
+        .map((ln, i) => `<tspan x="${f(s.x)}" y="${f(s.y + s.asc + i * s.lh)}">${esc(ln)}</tspan>`)
+        .join("");
+      const attrs = `font-family="${esc(familyCss(s.fontFamily))}" font-size="${f(s.fontSize)}"${s.bold ? ' font-weight="bold"' : ""}${s.italic ? ' font-style="italic"' : ""} fill="${esc(s.fill)}" xml:space="preserve"`;
+      if (!withId) return `<text${idAttr} ${attrs}>${spans}</text>`;
+      // On the canvas, add an invisible box so the whole text area can be clicked.
+      return `<g${idAttr}><rect x="${f(s.x)}" y="${f(s.y)}" width="${f(s.w)}" height="${f(s.h)}" fill="transparent"/><text ${attrs}>${spans}</text></g>`;
+    }
   }
 }
 

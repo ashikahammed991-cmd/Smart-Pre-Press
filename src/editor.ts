@@ -7,6 +7,7 @@ import {
   Pt,
   Shape,
   Style,
+  TextShape,
   bounds,
   center,
   docToSvg,
@@ -17,8 +18,9 @@ import {
   shapeToSvg,
   translate,
 } from "./model";
+import { TextProps, fontCss, measureText } from "./text";
 
-export type ToolName = "select" | "rect" | "ellipse" | "line" | "pen";
+export type ToolName = "select" | "rect" | "ellipse" | "line" | "pen" | "text";
 
 type HandleId = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
@@ -55,6 +57,14 @@ const HANDLE_CURSORS: Record<HandleId, string> = {
   w: "ew-resize",
 };
 
+interface TextEdit {
+  /** Working copy of the shape being typed into (the document's copy is updated on commit). */
+  shape: TextShape;
+  ta: HTMLTextAreaElement;
+  isNew: boolean;
+  guardUntil: number;
+}
+
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 export class Editor {
@@ -74,6 +84,11 @@ export class Editor {
   private hover: Pt | null = null;
   private clip: Shape[] = [];
   private spaceDown = false;
+  private editing: TextEdit | null = null;
+  private lastClick = { t: 0, id: "", x: 0, y: 0 };
+
+  /** Defaults for the next text (font size in px; 1 px = 0.75 pt). */
+  textStyle: TextProps = { fontFamily: "Arial", fontSize: 24, bold: false, italic: false };
 
   private baseView: Box = this.fitBox();
   private view: Box = { ...this.baseView };
@@ -207,6 +222,7 @@ export class Editor {
   // ---------- public API ----------
 
   setTool(t: ToolName): void {
+    this.commitEdit(false);
     if (this.tool === "pen" && t !== "pen") this.finishPen(false);
     this.tool = t;
     if (t !== "select") this.selectedIds = [];
@@ -223,6 +239,154 @@ export class Editor {
       for (const s of sel) Object.assign(s, patch);
       this.render();
     }
+  }
+
+  /** The selected shape if it is text (to mirror its font into the Text panel). */
+  selectedText(): TextShape | undefined {
+    const s = this.selected();
+    return s && s.kind === "text" ? s : undefined;
+  }
+
+  /** Change font family / size (px) / bold / italic of the selected text, and of new text. */
+  setTextProps(patch: Partial<TextProps>): void {
+    Object.assign(this.textStyle, patch);
+    const ed = this.editing;
+    if (ed) {
+      Object.assign(ed.shape, patch);
+      this.layoutEditor();
+      return;
+    }
+    const sel = this.selectedShapes().filter((s): s is TextShape => s.kind === "text");
+    if (!sel.length) return;
+    this.pushUndo();
+    for (const s of sel) {
+      Object.assign(s, patch);
+      Object.assign(s, measureText(s.text, s));
+    }
+    this.render();
+  }
+
+  // ---------- text editing ----------
+
+  private newText(p: Pt): TextShape {
+    return {
+      id: newId(),
+      kind: "text",
+      x: p.x,
+      y: p.y,
+      text: "",
+      ...this.style,
+      strokeWidth: 0,
+      ...this.textStyle,
+      ...measureText(" ", this.textStyle),
+    };
+  }
+
+  private startEdit(shape: TextShape, isNew: boolean): void {
+    this.commitEdit(true);
+    const host = this.svg.parentElement;
+    if (!host) return;
+    const ta = document.createElement("textarea");
+    ta.className = "text-edit";
+    ta.value = shape.text;
+    ta.spellcheck = false;
+    ta.setAttribute("wrap", "off");
+    ta.rows = 1;
+    ta.style.color = shape.fill;
+    host.appendChild(ta);
+    const ed: TextEdit = { shape: clone(shape), ta, isNew, guardUntil: performance.now() + 250 };
+    this.editing = ed;
+    ta.addEventListener("input", () => this.layoutEditor());
+    ta.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        this.cancelEdit();
+      } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        this.commitEdit(false);
+      }
+    });
+    ta.addEventListener("keyup", (e) => e.stopPropagation());
+    ta.addEventListener("blur", () => {
+      if (this.editing !== ed) return;
+      if (performance.now() < ed.guardUntil) {
+        setTimeout(() => ta.focus(), 0); // the click that created it stole focus; take it back
+        return;
+      }
+      this.commitEdit(false);
+    });
+    this.layoutEditor();
+    setTimeout(() => {
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }, 0);
+    this.render();
+  }
+
+  /** Position and size the overlay so the text sits exactly where it will be drawn. */
+  private layoutEditor(): void {
+    const ed = this.editing;
+    const host = this.svg.parentElement;
+    const m = this.svg.getScreenCTM();
+    if (!ed || !host || !m) return;
+    const s = ed.shape;
+    const met = measureText(ed.ta.value || " ", s);
+    Object.assign(s, met);
+    const wrap = host.getBoundingClientRect();
+    const k = m.a;
+    const st = ed.ta.style;
+    st.left = `${m.a * s.x + m.e - wrap.left}px`;
+    st.top = `${m.d * s.y + m.f - wrap.top}px`;
+    st.width = `${met.w * k + 3}px`;
+    st.height = `${met.h * k}px`;
+    st.font = fontCss(s, s.fontSize * k);
+    st.lineHeight = `${met.lh * k}px`;
+    st.transform = s.rot ? `rotate(${s.rot}deg)` : "";
+  }
+
+  /** Finish typing. `stay` keeps the Text tool active (used when a click starts the next text). */
+  private commitEdit(stay: boolean): void {
+    const ed = this.editing;
+    if (!ed) return;
+    this.editing = null;
+    const text = ed.ta.value;
+    ed.ta.remove();
+    const s = ed.shape;
+    const empty = text.trim() === "";
+    if (ed.isNew) {
+      if (!empty) {
+        this.pushUndo();
+        this.doc.shapes.push({ ...s, text, ...measureText(text, s) });
+        this.selectedIds = stay ? [] : [s.id];
+        if (!stay) this.tool = "select";
+      } else if (!stay) {
+        this.tool = "select";
+      }
+    } else {
+      const cur = this.doc.shapes.find((x) => x.id === s.id);
+      if (cur && cur.kind === "text") {
+        if (empty) {
+          this.pushUndo();
+          this.doc.shapes = this.doc.shapes.filter((x) => x.id !== s.id);
+          this.selectedIds = [];
+        } else if (text !== cur.text) {
+          this.pushUndo();
+          cur.text = text;
+          Object.assign(cur, measureText(text, cur));
+        }
+      }
+    }
+    this.updateCursor();
+    this.render();
+  }
+
+  private cancelEdit(): void {
+    const ed = this.editing;
+    if (!ed) return;
+    this.editing = null;
+    ed.ta.remove();
+    this.render();
   }
 
   deleteSelected(): void {
@@ -419,6 +583,7 @@ export class Editor {
   }
 
   private onDown(e: PointerEvent): void {
+    if (this.editing) this.commitEdit(this.tool === "text");
     // Pan: middle mouse button, or hold Space and drag.
     if (e.button === 1 || (e.button === 0 && this.spaceDown)) {
       e.preventDefault();
@@ -460,6 +625,18 @@ export class Editor {
 
         const id = target.closest("[data-id]")?.getAttribute("data-id") ?? null;
         if (id) {
+          // Double-click on text = edit it. (Detected here because the first click re-renders the
+          // canvas, and the browser then does not deliver a dblclick event.)
+          const now = performance.now();
+          const lc = this.lastClick;
+          const again = now - lc.t < 400 && lc.id === id && Math.hypot(e.clientX - lc.x, e.clientY - lc.y) < 6;
+          this.lastClick = { t: again ? 0 : now, id, x: e.clientX, y: e.clientY };
+          const hit = this.doc.shapes.find((x) => x.id === id);
+          if (again && hit && hit.kind === "text" && this.selectable(hit) && !e.shiftKey) {
+            this.selectedIds = [hit.id];
+            this.startEdit(hit, false);
+            break;
+          }
           if (e.shiftKey) {
             this.select(id, true);
           } else if (!this.isSelected(id)) {
@@ -490,6 +667,17 @@ export class Editor {
         this.doc.shapes.push(shape);
         this.drag = { type: "draw", start: p, shape };
         this.render();
+        break;
+      }
+      case "text": {
+        const id = (e.target as Element).closest("[data-id]")?.getAttribute("data-id");
+        const hit = id ? this.doc.shapes.find((x) => x.id === id) : undefined;
+        if (hit && hit.kind === "text" && this.selectable(hit)) {
+          this.selectedIds = [hit.id];
+          this.startEdit(hit, false);
+        } else {
+          this.startEdit(this.newText(p), true);
+        }
         break;
       }
       case "pen": {
@@ -611,7 +799,7 @@ export class Editor {
 
   private onKey(e: KeyboardEvent): void {
     const target = e.target as HTMLElement;
-    if (target.tagName === "INPUT") return;
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
 
@@ -669,7 +857,7 @@ export class Editor {
       return;
     }
 
-    const tools: Record<string, ToolName> = { v: "select", r: "rect", e: "ellipse", l: "line", p: "pen" };
+    const tools: Record<string, ToolName> = { v: "select", r: "rect", e: "ellipse", l: "line", p: "pen", t: "text" };
     const t = tools[key];
     if (t) {
       this.setTool(t);
@@ -699,7 +887,8 @@ export class Editor {
 
   private onKeyUp(e: KeyboardEvent): void {
     if (e.key !== " ") return;
-    if ((e.target as HTMLElement).tagName === "INPUT") return;
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
     e.preventDefault();
     this.spaceDown = false;
     if (this.drag?.type !== "pan") this.updateCursor();
@@ -771,6 +960,20 @@ export class Editor {
         const b = f(o.x2, o.y2);
         return { ...o, x1: a.x, y1: a.y, x2: b.x, y2: b.y };
       }
+      case "text": {
+        // Text scales uniformly: the font size follows the larger of the two drag factors.
+        const k = sx === 1 ? Math.abs(sy) : sy === 1 ? Math.abs(sx) : Math.max(Math.abs(sx), Math.abs(sy));
+        return {
+          ...o,
+          x: ax + (o.x - ax) * k,
+          y: ay + (o.y - ay) * k,
+          fontSize: o.fontSize * k,
+          w: o.w * k,
+          h: o.h * k,
+          asc: o.asc * k,
+          lh: o.lh * k,
+        };
+      }
       case "path":
         return {
           ...o,
@@ -812,7 +1015,8 @@ export class Editor {
     parts.push(
       `<rect x="0" y="0" width="${this.doc.width}" height="${this.doc.height}" fill="#ffffff" stroke="#3a3f4b" stroke-width="1" vector-effect="non-scaling-stroke"/>`,
     );
-    for (const s of this.doc.shapes) parts.push(shapeToSvg(s, true));
+    const editId = this.editing && !this.editing.isNew ? this.editing.shape.id : null;
+    for (const s of this.doc.shapes) if (s.id !== editId) parts.push(shapeToSvg(s, true));
     const bl = this.doc.bleed ?? 0;
     if (bl > 0) {
       parts.push(
@@ -820,7 +1024,7 @@ export class Editor {
       );
     }
 
-    const sel = this.selectedShapes();
+    const sel = this.selectedShapes().filter((s) => s.id !== editId);
     const only = sel.length === 1 ? sel[0] : null;
     for (const s of sel) {
       const b = bounds(s);
@@ -880,6 +1084,7 @@ export class Editor {
     }
 
     this.svg.innerHTML = parts.join("");
+    this.layoutEditor();
     this.onChange();
   }
 }

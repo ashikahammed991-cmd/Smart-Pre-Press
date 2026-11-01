@@ -5,6 +5,7 @@ import { Cmyk, clampCmyk, cmykToHex, hexToCmyk } from "./color";
 import { mmToPx, pxToMm } from "./model";
 import { docToPdf, pdfBytes } from "./pdf";
 import { preflight } from "./preflight";
+import { listFonts } from "./text";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = (id: string) => $<HTMLInputElement>(id);
@@ -76,6 +77,44 @@ function mirrorStyle(s: { fill: string; stroke: string; strokeWidth: number; fil
   setCmykInputs("s", s.strokeCmyk ?? hexToCmyk(s.stroke));
 }
 mirrorStyle(editor.style);
+
+// ---------- text panel ----------
+const tFont = input("t-font");
+const tSize = input("t-size");
+const tBold = $<HTMLButtonElement>("t-bold");
+const tItalic = $<HTMLButtonElement>("t-italic");
+const PX_PER_PT = 96 / 72;
+
+void listFonts().then((names) => {
+  const dl = $("font-list");
+  for (const n of names) {
+    const o = document.createElement("option");
+    o.value = n;
+    dl.appendChild(o);
+  }
+});
+
+let lastTextKey = "";
+function mirrorText(): void {
+  const t = editor.selectedText();
+  const p = t ?? editor.textStyle;
+  const key = `${t?.id ?? ""}|${p.fontFamily}|${p.fontSize}|${p.bold}|${p.italic}`;
+  if (key === lastTextKey) return;
+  lastTextKey = key;
+  if (document.activeElement !== tFont) tFont.value = p.fontFamily;
+  if (document.activeElement !== tSize) tSize.value = String(Math.round((p.fontSize / PX_PER_PT) * 10) / 10);
+  tBold.classList.toggle("on", !!p.bold);
+  tItalic.classList.toggle("on", !!p.italic);
+}
+tFont.addEventListener("change", () => {
+  if (tFont.value.trim()) editor.setTextProps({ fontFamily: tFont.value.trim() });
+});
+tSize.addEventListener("input", () => {
+  const pt = Number(tSize.value);
+  if (pt > 0) editor.setTextProps({ fontSize: pt * PX_PER_PT });
+});
+tBold.addEventListener("click", () => editor.setTextProps({ bold: !(editor.selectedText() ?? editor.textStyle).bold }));
+tItalic.addEventListener("click", () => editor.setTextProps({ italic: !(editor.selectedText() ?? editor.textStyle).italic }));
 
 // ---------- document settings ----------
 const docW = input("doc-w");
@@ -244,14 +283,14 @@ function refreshUi(): void {
   // Rebuild only when something shown in the list changed (keeps double-click rename working,
   // and never rebuild while a name is being edited).
   const key = JSON.stringify(
-    editor.doc.shapes.map((s) => [s.id, s.kind, s.name, s.hidden, s.locked, s.kind === "line" ? s.stroke : s.fill, editor.isSelected(s.id)]),
+    editor.doc.shapes.map((s) => [s.id, s.kind, s.name, s.hidden, s.locked, s.kind === "line" ? s.stroke : s.fill, s.kind === "text" ? s.text : "", editor.isSelected(s.id)]),
   );
   if (key !== layerKey && !layerList.querySelector(".name-input")) {
     layerKey = key;
     layerList.innerHTML = "";
     [...editor.doc.shapes].reverse().forEach((s, i) => {
       const li = document.createElement("li");
-      const label = s.name || `${s.kind} ${editor.doc.shapes.length - i}`;
+      const label = s.name || (s.kind === "text" ? s.text.split("\n")[0].slice(0, 24) : `${s.kind} ${editor.doc.shapes.length - i}`);
       li.className = [editor.isSelected(s.id) ? "selected" : "", s.hidden ? "is-hidden" : "", s.locked ? "is-locked" : ""].join(" ").trim();
 
       const sw = document.createElement("span");
@@ -280,6 +319,8 @@ function refreshUi(): void {
     });
   }
 
+  mirrorText();
+
   // Mirror the selected shape's colours into the property inputs.
   const sel = editor.selected();
   if (sel && sel.id !== lastSelectedForProps) mirrorStyle(sel);
@@ -304,7 +345,14 @@ async function doExport(): Promise<void> {
   if (await saveText("drawing.svg", editor.toSvgString(), "svg", "SVG image")) status.textContent = "Exported SVG";
 }
 async function doExportPdf(): Promise<void> {
-  const bytes = pdfBytes(docToPdf(editor.doc));
+  status.textContent = "Building PDF…";
+  let bytes: Uint8Array;
+  try {
+    bytes = pdfBytes(await docToPdf(editor.doc));
+  } catch (err) {
+    status.textContent = `PDF export failed: ${(err as Error).message}`;
+    return;
+  }
   if (await saveBytes("print.pdf", bytes, "pdf", "PDF")) {
     const problems = preflight(editor.doc).filter((i) => i.level === "error" || i.level === "warn").length;
     status.textContent = problems ? `Exported print PDF (CMYK) with ${problems} preflight warning${problems === 1 ? "" : "s"}` : "Exported print PDF (CMYK)";

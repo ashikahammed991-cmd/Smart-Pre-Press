@@ -384,3 +384,30 @@ button.primary {
 .icon-btn.on {
   opacity: 1;
 }
+
+/* ---------- text tool ---------- */
+.text-edit {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 1px dashed #2f7cf6;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  transform-origin: center;
+  z-index: 5;
+}
+#side input[type="text"] {
+  width: 100%;
+  min-width: 0;
+}
+#side .toggle {
+  width: 30px;
+  padding: 4px 0;
+}
+#side .toggle.on {
+  background: #2f7cf6;
+  color: #fff;
+}

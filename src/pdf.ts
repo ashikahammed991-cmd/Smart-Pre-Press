@@ -1,14 +1,18 @@
 import { hexToCmyk } from "./color";
 import type { Cmyk } from "./color";
 import { Doc, Shape, center, mmToPx } from "./model";
+import { TextMask, deflate, rasterizeText } from "./text";
 
 /**
  * Minimal PDF writer for print output.
  *  - every colour is written as DeviceCMYK
  *  - TrimBox and BleedBox are set; content is clipped to the bleed box
  *  - optional crop marks in registration colour
- * The result is a plain ASCII/latin-1 string (1 character = 1 byte).
+ *  - live text is rasterised at 1200 dpi into 1-bit masks painted in the text's CMYK colour
+ * The result is a latin-1 string (1 character = 1 byte).
  */
+
+export const TEXT_DPI = 1200;
 
 const PT = 0.75; // 1 px = 0.75 pt
 const KAPPA = 0.5522847498;
@@ -59,6 +63,8 @@ function shapeStream(s: Shape): string {
       closed = false;
       sw = Math.max(sw, 1);
       break;
+    case "text":
+      return ""; // drawn separately as a bitmap mask (see textStream)
     case "path": {
       const nodes = s.nodes;
       if (nodes.length === 0) return "";
@@ -80,6 +86,29 @@ function shapeStream(s: Shape): string {
   return o + "Q\n";
 }
 
+/** Paint a text mask image (name `/Im<n>`) in the text's CMYK colour, honouring rotation. */
+function textStream(s: Shape, m: Pick<TextMask, "x" | "y" | "w" | "h">, name: string): string {
+  if (s.kind !== "text") return "";
+  const fillC = s.fillCmyk ?? hexToCmyk(s.fill);
+  let o = "q\n";
+  if (s.rot) {
+    const c = center(s);
+    const a = (s.rot * Math.PI) / 180;
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    o += `${n(cos, 6)} ${n(sin, 6)} ${n(-sin, 6)} ${n(cos, 6)} ${n(c.x - c.x * cos + c.y * sin, 4)} ${n(c.y - c.x * sin - c.y * cos, 4)} cm\n`;
+  }
+  // The image's top row must land at the top of the box; user space here is y-down, so flip once more.
+  o += `${fillOp(fillC)}\n${n(m.w, 4)} 0 0 ${n(-m.h, 4)} ${n(m.x, 4)} ${n(m.y + m.h, 4)} cm\n/${name} Do\nQ\n`;
+  return o;
+}
+
+function bytesToString(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 8192) out += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return out;
+}
+
 function cropMarks(w: number, h: number, bleed: number): string {
   const off = bleed + mmToPx(1); // gap between trim edge and mark, so marks never touch the bleed
   const len = mmToPx(5);
@@ -94,7 +123,7 @@ function cropMarks(w: number, h: number, bleed: number): string {
   return o + "Q\n";
 }
 
-export function docToPdf(doc: Doc): string {
+export async function docToPdf(doc: Doc): Promise<string> {
   const W = doc.width;
   const H = doc.height;
   const bleed = Math.max(0, doc.bleed ?? 0);
@@ -107,9 +136,34 @@ export function docToPdf(doc: Doc): string {
   const m = margin * PT;
   const b = bleed * PT;
 
+  // Rasterise live text first (one mask at a time keeps memory use low).
+  const images: { name: string; obj: string }[] = [];
+  const maskOf = new Map<string, string>();
+  const placed = new Map<string, Pick<TextMask, "x" | "y" | "w" | "h">>();
+  for (const s of doc.shapes) {
+    if (s.kind !== "text" || s.hidden || !s.text.trim()) continue;
+    const mask = rasterizeText(s, TEXT_DPI);
+    const { data, compressed } = await deflate(mask.data);
+    const name = `Im${images.length + 1}`;
+    const body = bytesToString(data);
+    images.push({
+      name,
+      obj: `<< /Type /XObject /Subtype /Image /Width ${mask.pxW} /Height ${mask.pxH} /ImageMask true /BitsPerComponent 1 /Decode [1 0]${compressed ? " /Filter /FlateDecode" : ""} /Length ${body.length} >>\nstream\n${body}\nendstream`,
+    });
+    maskOf.set(s.id, name);
+    placed.set(s.id, { x: mask.x, y: mask.y, w: mask.w, h: mask.h });
+  }
+
   let content = `q\n${n(PT, 4)} 0 0 ${n(-PT, 4)} ${n(m)} ${n(pageH - m)} cm\n`;
   content += `q\n${n(-bleed)} ${n(-bleed)} ${n(W + 2 * bleed)} ${n(H + 2 * bleed)} re W n\n`;
-  for (const s of doc.shapes) if (!s.hidden) content += shapeStream(s);
+  for (const s of doc.shapes) {
+    if (s.hidden) continue;
+    const name = maskOf.get(s.id);
+    const mask = placed.get(s.id);
+    if (s.kind === "text") {
+      if (name && mask) content += textStream(s, mask, name);
+    } else content += shapeStream(s);
+  }
   content += "Q\n";
   if (marks) content += cropMarks(W, H, bleed);
   content += "Q\n";
@@ -118,9 +172,10 @@ export function docToPdf(doc: Doc): string {
   const objs: string[] = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    `<< /Type /Page /Parent 2 0 R /MediaBox ${box(0, 0, pageW, pageH)} /TrimBox ${box(m, m, pageW - m, pageH - m)} /BleedBox ${box(m - b, m - b, pageW - m + b, pageH - m + b)} /Contents 4 0 R /Resources << >> >>`,
+    `<< /Type /Page /Parent 2 0 R /MediaBox ${box(0, 0, pageW, pageH)} /TrimBox ${box(m, m, pageW - m, pageH - m)} /BleedBox ${box(m - b, m - b, pageW - m + b, pageH - m + b)} /Contents 4 0 R /Resources << ${images.length ? `/XObject << ${images.map((im, i) => `/${im.name} ${6 + i} 0 R`).join(" ")} >>` : ""} >> >>`,
     `<< /Length ${content.length} >>\nstream\n${content}endstream`,
     "<< /Producer (Smart Pre-Press) /Title (Smart Pre-Press print file) >>",
+    ...images.map((im) => im.obj),
   ];
 
   let out = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";

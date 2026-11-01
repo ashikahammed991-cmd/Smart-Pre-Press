@@ -45,8 +45,14 @@ A full professional editor is built in stages; each stage ships as a GitHub Rele
 - [ ] Preflight: low-resolution images, fonts not embedded (once text and images exist)
 - [ ] Registration marks, colour bars, page info slug
 
-## v0.7 - text and import
-- [ ] Text tool, fonts, text on path
+## v0.6 - text tool (done)
+- [x] Text tool (T): click, type, any language the system fonts support (Bangla, Hindi, Arabic, CJK...)
+- [x] Font, size (pt), bold, italic; double-click to edit; resize and rotate
+- [x] PDF export: text is rasterised at 1200 dpi (not vector yet)
+- [ ] Vector outlines for text in the PDF (shaping engine, e.g. Rust rustybuzz)
+- [ ] Alignment, paragraph/area text, text on path
+
+## v0.7 - import and gradients
 - [ ] Import SVG and raster images
 - [ ] Export PNG at chosen resolution
 
