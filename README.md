@@ -1,92 +1,41 @@
 # Smart Pre-Press
 
-An open-source desktop vector graphics editor built with **Tauri + TypeScript**.
-Draw shapes, build curves with the pen tool, organise layers, and export clean SVG.
+Press automation for print shops: drop in the customer PDFs, type the quantities, and get the **ups, the paper ratio, the cost and a print-ready imposed PDF** for CTP.
 
-> Smart Pre-Press is an independent project. It is not affiliated with Adobe.
+## What it does (v1.0)
 
-## Features (v0.1)
+1. **Add PDFs or a whole folder.** The trim size comes from each PDF's TrimBox (MediaBox if there is none) and `/Rotate` is respected.
+2. **Type the quantity** for every job.
+3. **Automatic layout** on your press sheet:
+   - *Step & repeat*: every job on its own sheets, as many ups as fit (grid first, then a MaxRects packer, optional 90° rotation).
+   - *Gang run*: different jobs share a sheet; the number of ups of each job is chosen so all jobs finish together, and jobs are only merged when that lowers the total cost.
+   - *Auto*: builds both and keeps the cheaper plan.
+4. **Costing**: paper (parent sheet price ÷ ratio, plus make-ready and spoilage sheets), plates, make-ready, machine run, finishing, overhead and profit. The cost of a sheet set is shared between its jobs by the sheet area they use, so you get a cost and a price per piece for every job. Export it as CSV.
+5. **Export plate PDF**: one page per sheet side. Front/back jobs (PDFs with two pages) are imposed work-and-turn (the back is mirrored left-to-right). Each page has cut ticks, registration targets, a CMYK colour bar and a slug line.
 
-- Rectangle, ellipse, line and pen (bezier) tools
-- Select, move, delete, bring forward / send backward
-- Fill, stroke colour and stroke width
-- Resize handles (hold Shift on a corner to keep proportions)
-- Rotate with the round knob above a selected shape (hold Shift to snap to 15°)
-- Multi-select: Shift+click, drag a box on empty canvas, or Ctrl+A; move, recolour, copy and delete them together
-- Zoom (mouse wheel) and pan (Space + drag, or middle mouse button)
-- Copy, paste, duplicate, arrow-key nudging
-- **Pre-press:** page size presets (A3/A4/A5/Letter/business card) or custom mm size, bleed, optional crop marks
-- **CMYK colour:** type C/M/Y/K percentages for fill and stroke
-- **Export print PDF:** all colours as DeviceCMYK, TrimBox + BleedBox set, content clipped to the bleed
-- **Swatches:** save CMYK colours, apply to fill or stroke in one click
-- **Preflight:** live checklist (missing bleed, ink over 300%, hairline strokes, RGB leftovers, small bleed)
-- Layers: hide, lock and rename (double-click the name)
-- Undo / redo
-- Save and open projects (`.spp`), export SVG
-- Runs on Windows, macOS and Linux
+The artwork is **not re-rendered**: pages are embedded as they are, so vectors stay vectors and images keep their full resolution and their colour spaces.
 
-## Shortcuts
+## Settings
 
-| Key | Action |
-| --- | --- |
-| V / R / E / L / P | Select / Rect / Ellipse / Line / Pen |
-| Enter or double-click | Finish an open pen path |
-| Click first point | Close the pen path |
-| Ctrl+A | Select all |
-| Shift+click | Add / remove a shape from the selection |
-| Del | Delete selection |
-| Ctrl+C / Ctrl+V / Ctrl+D | Copy / paste / duplicate |
-| Arrow keys (Shift = 10x) | Nudge selection |
-| Mouse wheel | Zoom at the cursor |
-| Space + drag | Pan |
-| Ctrl+0 / Ctrl++ / Ctrl+- | Reset / zoom in / zoom out |
-| Ctrl+Z / Ctrl+Shift+Z | Undo / redo |
-| Ctrl+S / Ctrl+O | Save / open project |
-| Ctrl+E / Ctrl+P | Export SVG / export print PDF |
+Everything is in millimetres: press sheet, gripper, margins, bleed, gap, parent sheet, ratio (0 = calculated from the sizes), spoilage, plates, machine rates, finishing, overhead and profit percentages, currency symbol. Settings are remembered between runs.
 
-Pen tool: click to add a corner point, click-and-drag to pull out a curve handle.
+## Known limits
 
-## Run it
+- Plates are **composite** CMYK imposed pages. Separate C / M / Y / K plate files need a separation engine and are planned (see ROADMAP.md); a CTP RIP can separate the composite file.
+- Only pages 1 (front) and 2 (back) of each PDF are used.
+- Every job is one flat piece; booklet / signature imposition is not included yet.
+- Cut ticks are drawn at the edges of the printed block; very irregular gang layouts may need the cutter to follow the trim lines.
 
-You need [Node.js 20+](https://nodejs.org) and, for the desktop app, [Rust](https://rustup.rs)
-plus the [Tauri prerequisites](https://tauri.app/start/prerequisites/).
+## Develop
 
-```bash
+```
 npm install
-npm run tauri icon app-icon.png   # one time: generates src-tauri/icons
-npm run tauri dev                 # desktop app
-# or just the web preview:
-npm run dev                       # http://localhost:1420
+npm run dev       # web preview on http://localhost:1420
+npm run tauri dev # desktop app
 ```
 
-No setup on your machine? Open the repo in **GitHub Codespaces** (Code -> Codespaces -> Create).
-The web preview works there out of the box.
+Releases are built by GitHub Actions: push a tag such as `v1.0.0` and installers appear in a draft Release.
 
-## Build installers with GitHub
+The previous Illustrator-style editor is kept in the Git history (tag `v0.8.0`).
 
-1. Push this project to a GitHub repository.
-2. Create a tag and push it:
-   ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
-   ```
-3. The **Release** workflow builds Windows, macOS and Linux installers and attaches them to a draft
-   release under *Releases*. Review it and press **Publish**.
-
-The **CI** workflow type-checks and builds the frontend on every push and pull request.
-
-## Project layout
-
-```
-src/model.ts     document model + SVG serialisation
-src/editor.ts    tools, selection, undo/redo, rendering
-src/io.ts        save/open (native dialogs in Tauri, browser fallback)
-src/main.ts      UI wiring
-src-tauri/       Rust shell (Tauri)
-.github/         CI and release workflows
-```
-
-**About colour accuracy:** the RGB-to-CMYK step is a simple mathematical conversion, not an ICC profile. For
-colour-critical jobs type the exact CMYK values yourself and confirm with your printer.
-
-See [ROADMAP.md](ROADMAP.md) for what is planned. License: MIT.
+MIT licensed.

@@ -1,73 +1,16 @@
-# Smart Pre-Press Roadmap
+# Roadmap
 
-Smart Pre-Press is an open-source vector graphics editor in the same family as Illustrator, Inkscape and Affinity Designer.
-It is an independent project and uses none of Adobe's code, branding or assets.
-A full professional editor is built in stages; each stage ships as a GitHub Release.
+## v1.0 - press automation (done)
+- [x] Add PDFs / folder, trim size from TrimBox, quantity per job
+- [x] Step & repeat, gang run, auto (cheaper) planning with rotation
+- [x] Parent sheet ratio, paper / plate / machine / finishing costing, per-job cost and price per piece, CSV export
+- [x] Imposed composite PDF (vector kept), work-and-turn backs, cut ticks, registration targets, colour bar, slug
 
-## v0.1 (this repo) - the foundation
-- [x] Artboard, rectangle / ellipse / line tools
-- [x] Pen tool with bezier handles, close path
-- [x] Select + move, delete, layer order
-- [x] Fill, stroke colour, stroke width
-- [x] Undo / redo
-- [x] Save/open project (.spp), export SVG
-- [x] Windows / macOS / Linux builds through GitHub Actions
-
-## v0.2 - editing precision
-- [x] Zoom and pan (wheel, space+drag)
-- [x] Resize handles
-- [x] Rotate handle, multi-select, marquee select
-- [ ] Direct selection: move anchors and handles of existing paths
-- [ ] Snapping, guides, rulers, grid
-- [x] Copy / paste / duplicate
-- [ ] Group / ungroup
-
-## v0.3 - layers and appearance
-- [ ] Nested layers and groups
-- [ ] Gradients, opacity, dashed strokes, blend modes
-- [ ] Align and distribute
-- [ ] Multiple artboards
-
-## v0.4 - pre-press basics (done)
-- [x] Page size presets, custom size, bleed
-- [x] CMYK fill and stroke
-- [x] Print PDF export with TrimBox/BleedBox and crop marks
-
-## v0.5 - swatches, layers, preflight (done)
-- [x] Swatches panel (CMYK)
-- [x] Preflight checks: missing bleed, ink limit, hairlines, RGB, small bleed
-- [x] Layer hide / lock / rename
-
-## v0.6 - pre-press, next
-- [ ] ICC colour profiles (e.g. FOGRA39, SWOP) and soft-proofing
-- [ ] Spot colours / Pantone-style named inks
-- [ ] Overprint, rich-black warnings, total ink limit check
-- [ ] Preflight: low-resolution images, fonts not embedded (once text and images exist)
-- [ ] Registration marks, colour bars, page info slug
-
-## v0.6 - text tool (done)
-- [x] Text tool (T): click, type, any language the system fonts support (Bangla, Hindi, Arabic, CJK...)
-- [x] Font, size (pt), bold, italic; double-click to edit; resize and rotate
-- [x] PDF export: text is rasterised at 1200 dpi (not vector yet)
-- [ ] Vector outlines for text in the PDF (shaping engine, e.g. Rust rustybuzz)
-- [ ] Alignment, paragraph/area text, text on path
-
-## v0.7 - gradients (done)
-- [x] Linear and radial gradient fills (CMYK stops, angle), SVG and PDF (real PDF shadings)
-- [ ] Gradient with more than two stops in the UI (the file format and PDF already support it)
-
-## v0.8 - import
-- [ ] Import SVG and raster images
-- [ ] Export PNG at chosen resolution
-
-## v0.8 - path operations
-- [ ] Pathfinder: union, subtract, intersect, exclude
-- [ ] Offset path, simplify, outline stroke
-- [ ] Pencil / brush tool with smoothing
-- [ ] Anchor add / delete / convert
-
-## Later
-- [ ] Symbols and reusable components
-- [ ] Image trace
-- [ ] Plugin API
-- [ ] Performance: move the geometry engine to Rust (WASM or native)
+## Next
+- [ ] Separate C / M / Y / K plate PDFs (bundled separation engine)
+- [ ] Several press-sheet sizes: pick the cheapest automatically
+- [ ] Hot folder: watch a folder and plan automatically
+- [ ] Saved jobs / customers, quotation PDF
+- [ ] Booklet and signature imposition (multi-page jobs)
+- [ ] Per-job colour counts (spot colours, 1-colour jobs on a 4-colour sheet)
+- [ ] Plate bending / punch offsets, CTP plate size presets
