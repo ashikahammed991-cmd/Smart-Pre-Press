@@ -6,6 +6,11 @@
 - [x] Parent sheet ratio, paper / plate / machine / finishing costing, per-job cost and price per piece, CSV export
 - [x] Imposed composite PDF (vector kept), work-and-turn backs, cut ticks, registration targets, colour bar, slug
 
+## v1.1 - ups typed by the user (done)
+- [x] One Ups box (columns × rows, e.g. 3 × 6 = 18) used for every PDF; only the quantity is typed per PDF
+- [x] Ratio and press-sheet size worked out from the ups (cut from the parent sheet), per sheet set
+- [x] Cut marks for every horizontal and vertical cut
+
 ## Next
 - [ ] Separate C / M / Y / K plate PDFs (bundled separation engine)
 - [ ] Several press-sheet sizes: pick the cheapest automatically

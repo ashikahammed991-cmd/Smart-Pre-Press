@@ -7,6 +7,7 @@ export function autoRatio(S: Settings): number {
   return Math.max(1, a, b);
 }
 
+/** Ratio for the fixed press sheet: the typed value, or the straight-cut automatic one. */
 export function effectiveRatio(S: Settings): number {
   return S.ratio > 0 ? S.ratio : autoRatio(S);
 }
@@ -19,7 +20,9 @@ export function sheetsToBuy(S: Settings, sheets: number): number {
 /** Cost of one sheet set (paper, plates, machine, finishing, overhead, profit) split across its jobs. */
 export function setCost(S: Settings, set: SheetSet, jobs: Map<string, Job>): SetCost {
   const bought = sheetsToBuy(S, set.sheets);
-  const paper = (bought * S.parentPrice) / effectiveRatio(S);
+  const ratio = Math.max(1, set.ratio);
+  const parentSheets = Math.ceil(bought / ratio);
+  const paper = parentSheets * S.parentPrice;
   const plateCount = Math.max(0, S.colorsFront) + (set.hasBack ? Math.max(0, S.colorsBack) : 0);
   const plates = plateCount * S.plateCost;
   const impressions = bought * (set.hasBack ? 2 : 1);
@@ -39,6 +42,7 @@ export function setCost(S: Settings, set: SheetSet, jobs: Map<string, Job>): Set
   return {
     setId: set.id,
     sheetsBought: bought,
+    parentSheets,
     paper,
     plates,
     plateCount,

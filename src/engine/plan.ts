@@ -1,4 +1,4 @@
-import { bestGrid, packAll } from "./pack";
+import { packAll } from "./pack";
 import type { Item } from "./pack";
 import { effectiveRatio, setCost } from "./cost";
 import type { Job, Placement, Plan, Settings, SheetSet } from "./types";
@@ -20,49 +20,83 @@ export function printArea(S: Settings): Area {
   };
 }
 
+/** Settings with the press sheet of one set filled in (the sheet differs per set in auto mode). */
+export const withSheet = (S: Settings, set: { sheetW: number; sheetH: number }): Settings => ({ ...S, sheetW: set.sheetW, sheetH: set.sheetH });
+
 const cell = (S: Settings, j: Job) => ({ w: j.w + 2 * S.bleed, h: j.h + 2 * S.bleed });
+const EPS = 1e-6;
 
-/** Place `ups` copies of each job; returns null when they do not all fit. */
-function arrange(S: Settings, group: Job[], ups: Record<string, number>): Placement[] | null {
-  const A = printArea(S);
-  if (A.W <= 0 || A.H <= 0) return null;
+interface Sheet {
+  w: number;
+  h: number;
+  ratio: number;
+}
 
-  // One job on its own: a clean grid when it is big enough, otherwise let the packer try.
-  if (group.length === 1) {
-    const j = group[0];
-    const c = cell(S, j);
-    const n = ups[j.id] ?? 0;
-    const g = bestGrid(c.w, c.h, A.W, A.H, S.gutter, S.allowRotate);
-    if (g.count >= n) {
-      const cw = g.rot ? c.h : c.w;
-      const ch = g.rot ? c.w : c.h;
-      const out: Placement[] = [];
-      for (let i = 0; i < n; i++) {
-        const col = i % g.nx;
-        const row = Math.floor(i / g.nx);
-        out.push({ jobId: j.id, x: A.x0 + col * (cw + S.gutter), y: A.y0 + row * (ch + S.gutter), w: cw, h: ch, rot: g.rot });
+/** Press sheets to try, best first: highest ratio (smallest sheet), cut from the parent in equal pieces. */
+function candidateSheets(S: Settings): Sheet[] {
+  if (S.sheetMode === "fixed") return [{ w: S.sheetW, h: S.sheetH, ratio: effectiveRatio(S) }];
+  const out = new Map<string, Sheet>();
+  for (let a = 1; a <= 16; a++) {
+    for (let b = 1; b <= 16; b++) {
+      const ratio = a * b;
+      if (S.ratio > 0 && ratio !== S.ratio) continue;
+      const pw = S.parentW / a;
+      const ph = S.parentH / b;
+      for (const [w, h] of [[pw, ph], [ph, pw]]) {
+        if (w > S.sheetW + EPS || h > S.sheetH + EPS) continue; // too big for the machine
+        if (w < S.minSheetW - EPS || h < S.minSheetH - EPS) continue; // too small to feed
+        const key = `${w.toFixed(2)}x${h.toFixed(2)}`;
+        const have = out.get(key);
+        if (!have || have.ratio < ratio) out.set(key, { w, h, ratio });
       }
-      return centre(out, A);
     }
   }
+  return [...out.values()].sort((x, y) => y.ratio - x.ratio || x.w * x.h - y.w * y.h);
+}
 
-  const items: Item[] = [];
-  for (const j of group) {
-    const c = cell(S, j);
-    for (let i = 0; i < (ups[j.id] ?? 0); i++) items.push({ key: j.id, w: c.w, h: c.h });
+interface Grid {
+  nx: number;
+  ny: number;
+  rot: boolean;
+  exact: boolean;
+  /** Block size (cells plus gutters). */
+  bw: number;
+  bh: number;
+}
+
+/** Every grid of `ups` cells (columns x rows, last row may be short) that fits in the printable area. */
+function grids(S: Settings, job: Job, A: Area): Grid[] {
+  const c = cell(S, job);
+  const out: Grid[] = [];
+  const ups = job.ups;
+  for (const rot of S.allowRotate && Math.abs(c.w - c.h) > EPS ? [false, true] : [false]) {
+    const cw = rot ? c.h : c.w;
+    const ch = rot ? c.w : c.h;
+    for (let nx = 1; nx <= ups; nx++) {
+      if (job.cols > 0 && nx !== job.cols) continue;
+      const ny = Math.ceil(ups / nx);
+      const bw = nx * cw + (nx - 1) * S.gutter;
+      const bh = ny * ch + (ny - 1) * S.gutter;
+      if (bw <= A.W + EPS && bh <= A.H + EPS) out.push({ nx, ny, rot, exact: nx * ny === ups, bw, bh });
+    }
   }
-  const packed = packAll(items, A.W, A.H, S.gutter, S.allowRotate);
-  if (!packed) return null;
-  const byId = new Map(group.map((j) => [j.id, j]));
-  return centre(
-    packed.map((p) => {
-      const j = byId.get(p.key)!;
-      const c = cell(S, j);
-      // the packer reports `rot` relative to the (w,h) it was given
-      return { jobId: p.key, x: A.x0 + p.x, y: A.y0 + p.y, w: p.rot ? c.h : c.w, h: p.rot ? c.w : c.h, rot: p.rot };
-    }),
-    A,
-  );
+  return out;
+}
+
+/** Place the cells of a grid in reading order, centred in the printable area. */
+function gridPlacements(S: Settings, job: Job, g: Grid, A: Area): Placement[] {
+  const c = cell(S, job);
+  const cw = g.rot ? c.h : c.w;
+  const ch = g.rot ? c.w : c.h;
+  const x0 = A.x0 + (A.W - g.bw) / 2;
+  const y0 = A.y0 + (A.H - g.bh) / 2;
+  const out: Placement[] = [];
+  for (let i = 0; i < job.ups; i++) {
+    const col = i % g.nx;
+    const row = Math.floor(i / g.nx);
+    out.push({ jobId: job.id, x: x0 + col * (cw + S.gutter), y: y0 + row * (ch + S.gutter), w: cw, h: ch, rot: g.rot });
+  }
+  return out;
 }
 
 /** Centre the used block inside the printable area (keeps cut marks symmetrical). */
@@ -77,54 +111,81 @@ function centre(ps: Placement[], A: Area): Placement[] {
   return ps.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy }));
 }
 
-/** Smallest number of sheets N so that ceil(qty/N) copies of every job fit on one sheet. */
-function solve(S: Settings, group: Job[], id: number): SheetSet | null {
-  const maxQty = Math.max(...group.map((j) => j.qty));
-  const upsFor = (n: number) => Object.fromEntries(group.map((j) => [j.id, Math.max(1, Math.ceil(j.qty / n))]));
-  const ones = arrange(S, group, upsFor(maxQty));
-  if (!ones) return null;
-
-  let lo = 1;
-  let hi = maxQty;
-  let best = { n: maxQty, p: ones };
-  while (lo < hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    const p = arrange(S, group, upsFor(mid));
-    if (p) {
-      best = { n: mid, p };
-      hi = mid;
-    } else lo = mid + 1;
+/** Pack several jobs' cells with the general packer. */
+function packGroup(S: Settings, group: Job[], A: Area): Placement[] | null {
+  const items: Item[] = [];
+  for (const j of group) {
+    const c = cell(S, j);
+    for (let i = 0; i < j.ups; i++) items.push({ key: j.id, w: c.w, h: c.h });
   }
-  // the packer is a heuristic, so check a few smaller run lengths too
-  for (let n = Math.max(1, best.n - 3); n < best.n; n++) {
-    const p = arrange(S, group, upsFor(n));
-    if (p) {
-      best = { n, p };
-      break;
-    }
-  }
-
-  const ups = upsFor(best.n);
-  const trim = best.p.reduce((t, p) => {
-    const j = group.find((g) => g.id === p.jobId)!;
-    return t + j.w * j.h;
-  }, 0);
-  return {
-    id,
-    jobIds: group.map((j) => j.id),
-    placements: best.p,
-    ups,
-    sheets: best.n,
-    printed: Object.fromEntries(group.map((j) => [j.id, ups[j.id] * best.n])),
-    hasBack: group.some((j) => j.pages >= 2),
-    utilisation: trim / (S.sheetW * S.sheetH),
-  };
+  const packed = packAll(items, A.W, A.H, S.gutter, S.allowRotate);
+  if (!packed) return null;
+  const byId = new Map(group.map((j) => [j.id, j]));
+  return centre(
+    packed.map((p) => {
+      const c = cell(S, byId.get(p.key)!);
+      return { jobId: p.key, x: A.x0 + p.x, y: A.y0 + p.y, w: p.rot ? c.h : c.w, h: p.rot ? c.w : c.h, rot: p.rot };
+    }),
+    A,
+  );
 }
 
-const area = (S: Settings, j: Job) => {
-  const c = cell(S, j);
-  return c.w * c.h;
-};
+interface Fit {
+  sheet: Sheet;
+  placements: Placement[];
+}
+
+/** Find the smallest press sheet (highest ratio) that holds every job's ups, and the layout on it. */
+function fit(S: Settings, group: Job[]): Fit | null {
+  const sheets = candidateSheets(S);
+  if (group.length === 1) {
+    const job = group[0];
+    // Prefer a clean grid (all rows full) on any sheet, then allow a short last row.
+    for (const exactOnly of [true, false]) {
+      for (const sh of sheets) {
+        const Ss = { ...S, sheetW: sh.w, sheetH: sh.h };
+        const A = printArea(Ss);
+        if (A.W <= 0 || A.H <= 0) continue;
+        const list = grids(Ss, job, A).filter((g) => (exactOnly ? g.exact : true));
+        if (!list.length) continue;
+        // squarest block first: fewer, longer cuts are not the goal, a compact block is
+        list.sort((a, b) => Number(b.exact) - Number(a.exact) || a.bw * a.bh - b.bw * b.bh || Math.abs(a.nx - a.ny) - Math.abs(b.nx - b.ny));
+        return { sheet: sh, placements: gridPlacements(Ss, job, list[0], A) };
+      }
+    }
+  }
+  for (const sh of sheets) {
+    const Ss = { ...S, sheetW: sh.w, sheetH: sh.h };
+    const A = printArea(Ss);
+    if (A.W <= 0 || A.H <= 0) continue;
+    const p = packGroup(Ss, group, A);
+    if (p) return { sheet: sh, placements: p };
+  }
+  return null;
+}
+
+const runSheets = (j: Job) => Math.max(1, Math.ceil(j.qty / Math.max(1, j.ups)));
+
+function solve(S: Settings, group: Job[], id: number): SheetSet | null {
+  const f = fit(S, group);
+  if (!f) return null;
+  const sheets = Math.max(...group.map(runSheets));
+  const ups = Object.fromEntries(group.map((j) => [j.id, j.ups]));
+  const trim = group.reduce((t, j) => t + j.w * j.h * j.ups, 0);
+  return {
+    id,
+    sheetW: f.sheet.w,
+    sheetH: f.sheet.h,
+    ratio: f.sheet.ratio,
+    jobIds: group.map((j) => j.id),
+    placements: f.placements,
+    ups,
+    sheets,
+    printed: Object.fromEntries(group.map((j) => [j.id, j.ups * sheets])),
+    hasBack: group.some((j) => j.pages >= 2),
+    utilisation: trim / (f.sheet.w * f.sheet.h),
+  };
+}
 
 function planStep(S: Settings, jobs: Job[]): { sets: SheetSet[]; unplaced: string[] } {
   const sets: SheetSet[] = [];
@@ -137,14 +198,15 @@ function planStep(S: Settings, jobs: Job[]): { sets: SheetSet[]; unplaced: strin
   return { sets, unplaced };
 }
 
-/** Gang run: merge jobs onto shared sheets whenever that lowers the total cost. */
+/** Gang run: jobs share a sheet when it fits and costs less than printing them apart. */
 function planGang(S: Settings, jobs: Job[]): { sets: SheetSet[]; unplaced: string[] } {
   const map = new Map(jobs.map((j) => [j.id, j]));
   const costOf = (s: SheetSet) => setCost(S, s, map).total;
   const groups: { jobs: Job[]; set: SheetSet }[] = [];
   const unplaced: string[] = [];
 
-  for (const j of [...jobs].sort((a, b) => area(S, b) - area(S, a))) {
+  // similar run lengths together, so no job is printed far beyond its quantity
+  for (const j of [...jobs].sort((a, b) => runSheets(b) - runSheets(a))) {
     const solo = solve(S, [j], 0);
     if (!solo) {
       unplaced.push(j.id);
@@ -169,20 +231,32 @@ function planGang(S: Settings, jobs: Job[]): { sets: SheetSet[]; unplaced: strin
   return { sets: groups.map((g, i) => ({ ...g.set, id: i + 1 })), unplaced };
 }
 
-function finish(S: Settings, mode: "step" | "gang", jobs: Job[], r: { sets: SheetSet[]; unplaced: string[] }): Plan {
+/** Build the imposition and cost plan for all jobs that have a quantity and a number of ups. */
+export function makePlan(S: Settings, allJobs: Job[]): Plan {
+  const jobs = allJobs.filter((j) => j.qty > 0 && j.ups > 0 && j.w > 0 && j.h > 0);
+  const r = S.mode === "gang" ? planGang(S, jobs) : planStep(S, jobs);
   const map = new Map(jobs.map((j) => [j.id, j]));
   const costs = r.sets.map((s) => setCost(S, s, map));
-  return { mode, sets: r.sets, costs, total: costs.reduce((t, c) => t + c.total, 0), ratio: effectiveRatio(S), unplaced: r.unplaced };
+  return { mode: S.mode === "gang" ? "gang" : "step", sets: r.sets, costs, total: costs.reduce((t, c) => t + c.total, 0), unplaced: r.unplaced };
 }
 
-/** Build the imposition and cost plan for all jobs that have a quantity. */
-export function makePlan(S: Settings, allJobs: Job[]): Plan {
-  const jobs = allJobs.filter((j) => j.qty > 0 && j.w > 0 && j.h > 0);
-  if (S.mode === "step") return finish(S, "step", jobs, planStep(S, jobs));
-  if (S.mode === "gang") return finish(S, "gang", jobs, planGang(S, jobs));
-  const a = finish(S, "step", jobs, planStep(S, jobs));
-  const b = finish(S, "gang", jobs, planGang(S, jobs));
-  if (b.unplaced.length < a.unplaced.length) return b;
-  if (a.unplaced.length < b.unplaced.length) return a;
-  return b.total < a.total - 1e-9 ? b : a;
+/** Where the guillotine cuts fall: trim-edge positions of every cell and the extent of the printed block. */
+export function cutLines(S: Settings, cells: Placement[]): { xs: number[]; ys: number[]; minX: number; maxX: number; minY: number; maxY: number } {
+  const xs = new Set<number>();
+  const ys = new Set<number>();
+  const r = (v: number) => Math.round(v * 100) / 100;
+  for (const c of cells) {
+    xs.add(r(c.x + S.bleed));
+    xs.add(r(c.x + c.w - S.bleed));
+    ys.add(r(c.y + S.bleed));
+    ys.add(r(c.y + c.h - S.bleed));
+  }
+  return {
+    xs: [...xs].sort((a, b) => a - b),
+    ys: [...ys].sort((a, b) => a - b),
+    minX: Math.min(...cells.map((c) => c.x)),
+    maxX: Math.max(...cells.map((c) => c.x + c.w)),
+    minY: Math.min(...cells.map((c) => c.y)),
+    maxY: Math.max(...cells.map((c) => c.y + c.h)),
+  };
 }

@@ -8,14 +8,29 @@ export interface Job {
   h: number;
   pages: number;
   qty: number;
+  /** Copies of this job on one press sheet, entered by the user. */
+  ups: number;
+  /** Optional: copies per row (0 = let the program choose the grid). */
+  cols: number;
 }
 
-export type PlanMode = "auto" | "step" | "gang";
+/** step = every job on its own sheet; gang = jobs share sheets when that is cheaper. */
+export type PlanMode = "step" | "gang";
+
+/** auto = the press sheet is cut from the parent sheet to fit the ups; fixed = always the sheet size below. */
+export type SheetMode = "auto" | "fixed";
 
 export interface Settings {
-  // press sheet
+  /** Ups on every sheet: copies across (columns) x copies down (rows), typed by the user. */
+  upsCols: number;
+  upsRows: number;
+  sheetMode: SheetMode;
+  // press sheet (in "auto" mode these are the largest sheet the machine takes)
   sheetW: number;
   sheetH: number;
+  /** Smallest sheet the machine can feed (auto mode never cuts below this). */
+  minSheetW: number;
+  minSheetH: number;
   /** Unprintable gripper edge at the top of the sheet. */
   gripper: number;
   marginSide: number;
@@ -69,6 +84,10 @@ export interface Placement {
 
 export interface SheetSet {
   id: number;
+  /** Press sheet used by this set (cut from the parent sheet) and how many such sheets one parent gives. */
+  sheetW: number;
+  sheetH: number;
+  ratio: number;
   jobIds: string[];
   placements: Placement[];
   ups: Record<string, number>;
@@ -93,6 +112,7 @@ export interface JobCost {
 export interface SetCost {
   setId: number;
   sheetsBought: number;
+  parentSheets: number;
   paper: number;
   plates: number;
   plateCount: number;
@@ -110,13 +130,17 @@ export interface Plan {
   sets: SheetSet[];
   costs: SetCost[];
   total: number;
-  ratio: number;
   unplaced: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  upsCols: 3,
+  upsRows: 6,
+  sheetMode: "auto",
   sheetW: 584,
   sheetH: 914,
+  minSheetW: 280,
+  minSheetH: 400,
   gripper: 12,
   marginSide: 6,
   marginBottom: 6,
@@ -124,11 +148,11 @@ export const DEFAULT_SETTINGS: Settings = {
   bleed: 3,
   gutter: 0,
   allowRotate: true,
-  mode: "auto",
+  mode: "step",
   parentW: 584,
   parentH: 914,
   parentPrice: 40,
-  ratio: 1,
+  ratio: 0,
   spoilSheets: 50,
   spoilPct: 3,
   colorsFront: 4,

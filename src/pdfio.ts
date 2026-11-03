@@ -1,5 +1,5 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, cmyk, concatTransformationMatrix, drawObject, popGraphicsState, pushGraphicsState } from "pdf-lib";
-import { printArea } from "./engine/plan";
+import { cutLines, printArea, withSheet } from "./engine/plan";
 import type { Job, Placement, Plan, Settings, SheetSet } from "./engine/types";
 
 const PT = 72 / 25.4; // 1 mm in PDF points
@@ -50,7 +50,8 @@ interface Src {
 }
 
 /** Build the imposed, print-ready PDF: one page per sheet side, original artwork kept as vector / full-resolution images. */
-export async function buildImposedPdf(S: Settings, plan: Plan, jobs: Job[], sources: Map<string, Uint8Array>, onProgress?: (msg: string) => void): Promise<Uint8Array> {
+export async function buildImposedPdf(S0: Settings, plan: Plan, jobs: Job[], sources: Map<string, Uint8Array>, onProgress?: (msg: string) => void): Promise<Uint8Array> {
+  let S = S0;
   const out = await PDFDocument.create();
   out.setTitle("Smart Pre-Press imposed sheets");
   out.setProducer("Smart Pre-Press");
@@ -72,7 +73,7 @@ export async function buildImposedPdf(S: Settings, plan: Plan, jobs: Job[], sour
     }
     const page = src.doc.getPage(Math.min(pageIndex, src.doc.getPageCount() - 1));
     const t = page.getTrimBox();
-    const b = S.bleed * PT;
+    const b = S0.bleed * PT;
     const e = await out.embedPage(page, { left: t.x - b, bottom: t.y - b, right: t.x + t.width + b, top: t.y + t.height + b });
     embedded.set(key, e);
     return e;
@@ -84,6 +85,7 @@ export async function buildImposedPdf(S: Settings, plan: Plan, jobs: Job[], sour
   };
 
   for (const set of plan.sets) {
+    S = withSheet(S0, set); // every set can have its own press sheet size
     const sides: ("front" | "back")[] = set.hasBack ? ["front", "back"] : ["front"];
     for (const side of sides) {
       onProgress?.(`Sheet set ${set.id} (${side})`);
@@ -147,22 +149,12 @@ function drawBlank(page: PDFPage, p: Placement, S: Settings): void {
 
 function drawMarks(page: PDFPage, S: Settings, cells: Placement[], set: SheetSet, side: "front" | "back", font: PDFFont): void {
   const A = printArea(S);
-  const minX = Math.min(...cells.map((c) => c.x));
-  const maxX = Math.max(...cells.map((c) => c.x + c.w));
-  const minY = Math.min(...cells.map((c) => c.y));
-  const maxY = Math.max(...cells.map((c) => c.y + c.h));
+  const { xs, ys, minX, maxX, minY, maxY } = cutLines(S, cells);
   const line = (x1: number, y1: number, x2: number, y2: number) =>
     page.drawLine({ start: { x: x1 * PT, y: (S.sheetH - y1) * PT }, end: { x: x2 * PT, y: (S.sheetH - y2) * PT }, thickness: 0.25, color: REG });
 
-  // cut (crop) ticks at every trim edge, just outside the printed block
-  const xs = new Set<number>();
-  const ys = new Set<number>();
-  for (const c of cells) {
-    xs.add(Math.round((c.x + S.bleed) * 100) / 100);
-    xs.add(Math.round((c.x + c.w - S.bleed) * 100) / 100);
-    ys.add(Math.round((c.y + S.bleed) * 100) / 100);
-    ys.add(Math.round((c.y + c.h - S.bleed) * 100) / 100);
-  }
+  // cut marks at every cut: vertical ticks (top and bottom) for the vertical cuts,
+  // horizontal ticks (left and right) for the horizontal cuts, just outside the printed block
   const gap = 1.5;
   const len = 3.5;
   for (const x of xs) {
@@ -204,6 +196,7 @@ function drawMarks(page: PDFPage, S: Settings, cells: Placement[], set: SheetSet
 
   // slug line in the gripper margin
   const names = set.jobIds.map((id) => `${id}`).join(", ");
-  const text = safe(`Smart Pre-Press | Set ${set.id} | ${side.toUpperCase()}${side === "back" ? " (turn left-to-right)" : ""} | ${set.sheets} sheets | ${names}`);
+  const ups = set.jobIds.map((id) => `${set.ups[id]} ups`).join("+");
+  const text = safe(`Smart Pre-Press | Set ${set.id} | ${side.toUpperCase()}${side === "back" ? " (turn left-to-right)" : ""} | ${ups} | ratio ${set.ratio} | ${Math.round(set.sheetW)}x${Math.round(set.sheetH)} mm | ${set.sheets} sheets | ${names}`);
   if (S.gripper >= 5) page.drawText(text.slice(0, 160), { x: A.x0 * PT, y: (S.sheetH - 3.5) * PT, size: 6, font, color: BLACK });
 }

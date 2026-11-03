@@ -36,6 +36,11 @@ th { color: var(--dim); font-weight: 500; font-size: 11px; }
 td.num, th.num { text-align: right; }
 #jobs td.name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #jobs input { width: 74px; text-align: right; }
+#ups-box { background: var(--bg, #15181f); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
+.ups-title { font-weight: 600; margin-bottom: 6px; }
+.ups-row { display: flex; align-items: center; gap: 8px; }
+.ups-row input { width: 64px; text-align: center; font-size: 15px; }
+#ups-total { font-size: 20px; }
 #jobs .x { padding: 0 6px; border: none; background: none; color: var(--dim); }
 #jobs .x:hover { color: var(--bad); }
 .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }

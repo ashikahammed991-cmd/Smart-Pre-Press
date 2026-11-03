@@ -24,7 +24,19 @@
 
       <aside id="jobs-pane">
         <h2>Jobs</h2>
-        <div id="jobs-empty" class="hint">Add the PDFs (or a whole folder), then type the quantity for each job. Trim size is read from the PDF TrimBox (or MediaBox).</div>
+        <div id="ups-box">
+          <div class="ups-title">Ups on the sheet</div>
+          <div class="ups-row">
+            <input type="number" id="ups-cols" min="1" step="1" title="Copies across the sheet" />
+            <span>×</span>
+            <input type="number" id="ups-rows" min="1" step="1" title="Copies down the sheet" />
+            <span>=</span>
+            <b id="ups-total">0</b>
+            <span>ups</span>
+          </div>
+          <div class="hint">Columns × rows, e.g. 3 × 6 = 18. The ratio, press sheet, plates and cut marks follow from this. The same ups are used for every PDF.</div>
+        </div>
+        <div id="jobs-empty" class="hint">Add the PDFs (or a whole folder), then type the quantity for each one. Trim size is read from the PDF TrimBox (or MediaBox).</div>
         <table id="jobs">
           <thead>
             <tr><th>File</th><th>Size mm</th><th>Pg</th><th>Qty</th><th></th></tr>

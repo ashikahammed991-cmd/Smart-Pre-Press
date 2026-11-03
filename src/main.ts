@@ -1,6 +1,6 @@
 import "./style.css";
 import { effectiveRatio, autoRatio } from "./engine/cost";
-import { makePlan, printArea } from "./engine/plan";
+import { cutLines, makePlan, printArea, withSheet } from "./engine/plan";
 import { DEFAULT_SETTINGS } from "./engine/types";
 import type { Job, Placement, Plan, Settings, SheetSet } from "./engine/types";
 import { saveBytes, saveText } from "./io";
@@ -19,8 +19,8 @@ let side: "front" | "back" = "front";
 
 function loadSettings(): Settings {
   try {
-    const raw = localStorage.getItem("spp-settings");
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const raw = localStorage.getItem("spp-settings-v2");
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw), mode: "step" };
   } catch {
     /* storage unavailable */
   }
@@ -28,7 +28,7 @@ function loadSettings(): Settings {
 }
 function saveSettings(): void {
   try {
-    localStorage.setItem("spp-settings", JSON.stringify(settings));
+    localStorage.setItem("spp-settings-v2", JSON.stringify(settings));
   } catch {
     /* storage unavailable */
   }
@@ -44,18 +44,23 @@ interface Field {
   key: keyof Settings;
   label: string;
   unit?: string;
-  kind?: "num" | "bool" | "text" | "mode";
+  kind?: "num" | "bool" | "text" | "mode" | "sheetmode";
 }
 const SECTIONS: { title: string; fields: Field[] }[] = [
   {
     title: "Mode",
-    fields: [{ key: "mode", label: "Layout", kind: "mode" }, { key: "allowRotate", label: "Allow 90° rotation", kind: "bool" }],
+    fields: [
+      { key: "sheetMode", label: "Press sheet", kind: "sheetmode" },
+      { key: "allowRotate", label: "Allow 90° rotation", kind: "bool" },
+    ],
   },
   {
     title: "Press sheet",
     fields: [
-      { key: "sheetW", label: "Width", unit: "mm" },
-      { key: "sheetH", label: "Height", unit: "mm" },
+      { key: "sheetW", label: "Width (max in auto)", unit: "mm" },
+      { key: "sheetH", label: "Height (max in auto)", unit: "mm" },
+      { key: "minSheetW", label: "Smallest sheet width", unit: "mm" },
+      { key: "minSheetH", label: "Smallest sheet height", unit: "mm" },
       { key: "gripper", label: "Gripper edge (top)", unit: "mm" },
       { key: "marginSide", label: "Side margins", unit: "mm" },
       { key: "marginBottom", label: "Bottom margin", unit: "mm" },
@@ -112,10 +117,18 @@ function buildSettings(): void {
       let input: HTMLInputElement | HTMLSelectElement;
       if (f.kind === "mode") {
         input = document.createElement("select");
-        input.innerHTML = `<option value="auto">Auto (cheaper)</option><option value="step">Step &amp; repeat</option><option value="gang">Gang run</option>`;
-        input.value = settings.mode;
+        input.innerHTML = `<option value="step">Each job on its own sheet</option><option value="gang">Gang run (share sheets)</option>`;
+        input.value = settings.mode === "gang" ? "gang" : "step";
         input.addEventListener("change", () => {
           settings.mode = (input as HTMLSelectElement).value as Settings["mode"];
+          changed();
+        });
+      } else if (f.kind === "sheetmode") {
+        input = document.createElement("select");
+        input.innerHTML = `<option value="auto">Auto: cut to fit the ups</option><option value="fixed">Fixed size</option>`;
+        input.value = settings.sheetMode;
+        input.addEventListener("change", () => {
+          settings.sheetMode = (input as HTMLSelectElement).value as Settings["sheetMode"];
           changed();
         });
       } else if (f.kind === "bool") {
@@ -209,7 +222,7 @@ async function addFiles(files: File[]): Promise<void> {
       const base = f.name.replace(/\.pdf$/i, "");
       let id = base;
       for (let n = 2; jobs.some((j) => j.id === id); n++) id = `${base} (${n})`;
-      jobs.push({ id, name: id, w: info.w, h: info.h, pages: info.pages, qty: 1000 });
+      jobs.push({ id, name: id, w: info.w, h: info.h, pages: info.pages, qty: 1000, ups: 0, cols: 0 });
       sources.set(id, bytes);
     } catch (err) {
       failed.push(`${f.name}: ${(err as Error).message}`);
@@ -228,12 +241,24 @@ function changed(rebuildNow = true): void {
   timer = window.setTimeout(recompute, rebuildNow ? 120 : 250);
 }
 
+/** Every job gets the ups typed in the Ups box (columns x rows). */
+function planJobs(): Job[] {
+  const cols = Math.max(0, Math.floor(settings.upsCols));
+  const rows = Math.max(0, Math.floor(settings.upsRows));
+  return jobs.map((j) => ({ ...j, ups: cols * rows, cols }));
+}
+
 function recompute(): void {
+  const totalEl = document.getElementById("ups-total");
+  if (totalEl) totalEl.textContent = String(Math.max(0, Math.floor(settings.upsCols)) * Math.max(0, Math.floor(settings.upsRows)));
   const ratioNote = $("ratio-note");
   const auto = autoRatio(settings);
-  ratioNote.textContent = `Ratio in use: ${effectiveRatio(settings)} press sheet${effectiveRatio(settings) === 1 ? "" : "s"} per parent sheet (automatic would be ${auto}).`;
+  ratioNote.textContent =
+    settings.sheetMode === "auto"
+      ? `Auto: the press sheet is cut from the ${settings.parentW} × ${settings.parentH} mm parent sheet, as small as the ups allow, and never larger than ${settings.sheetW} × ${settings.sheetH} mm. Type a ratio above to force one.`
+      : `Fixed sheet: ratio ${effectiveRatio(settings)} press sheet${effectiveRatio(settings) === 1 ? "" : "s"} per parent sheet (automatic would be ${auto}).`;
   try {
-    plan = makePlan(settings, jobs);
+    plan = makePlan(settings, planJobs());
   } catch (err) {
     plan = null;
     setStatus(`Planning failed: ${(err as Error).message}`);
@@ -264,13 +289,14 @@ function renderResults(): void {
   if (A.W <= 0 || A.H <= 0) addWarn("The margins leave no printable area on the press sheet.", true);
   const noQty = jobs.filter((j) => j.qty <= 0).map((j) => j.name);
   if (noQty.length) addWarn(`No quantity entered for: ${noQty.join(", ")}`);
+  if (Math.floor(settings.upsCols) * Math.floor(settings.upsRows) <= 0) addWarn("Type the ups (columns × rows) above the job list.", true);
   if (!plan || !plan.sets.length) {
-    if (plan?.unplaced.length) addWarn(`Too big for the press sheet (with bleed): ${plan.unplaced.join(", ")}`, true);
+    if (plan?.unplaced.length) addWarn(`${settings.upsCols} × ${settings.upsRows} ups do not fit on the largest sheet (with bleed and margins) for: ${plan.unplaced.join(", ")}`, true);
     $("btn-pdf").toggleAttribute("disabled", true);
     $("btn-csv").toggleAttribute("disabled", true);
     return;
   }
-  if (plan.unplaced.length) addWarn(`Too big for the press sheet (with bleed), left out: ${plan.unplaced.join(", ")}`, true);
+  if (plan.unplaced.length) addWarn(`${settings.upsCols} × ${settings.upsRows} ups do not fit on the largest sheet (with bleed and margins), left out: ${plan.unplaced.join(", ")}`, true);
   const wide = jobs.filter((j) => j.pages > 2).map((j) => j.name);
   if (wide.length) addWarn(`Only pages 1 and 2 (front / back) are used for: ${wide.join(", ")}`);
   $("btn-pdf").toggleAttribute("disabled", false);
@@ -286,7 +312,7 @@ function renderResults(): void {
     card("Layout", plan.mode === "gang" ? "Gang run" : "Step & repeat") +
     card("Sheet sets", String(plan.sets.length)) +
     card("Press sheets to buy", int(bought)) +
-    card("Parent sheets", int(bought / plan.ratio)) +
+    card("Parent sheets", int(plan.costs.reduce((t, c) => t + c.parentSheets, 0))) +
     card("Plates", String(plates));
 
   // tabs
@@ -321,10 +347,10 @@ function renderResults(): void {
 
   // tables
   const jobById = new Map(jobs.map((j, i) => [j.id, { j, i }]));
-  let html = `<h3>Sheet sets</h3><table><thead><tr><th>Set</th><th>Jobs</th><th class="num">Sheets</th><th class="num">Buy</th><th class="num">Plates</th><th class="num">Paper</th><th class="num">Plates</th><th class="num">Machine</th><th class="num">Finish</th><th class="num">Overhead + profit</th><th class="num">Total</th><th class="num">Fill</th></tr></thead><tbody>`;
+  let html = `<h3>Sheet sets</h3><table><thead><tr><th>Set</th><th>Jobs</th><th>Ups</th><th>Sheet mm</th><th class="num">Ratio</th><th class="num">Sheets</th><th class="num">Buy</th><th class="num">Plates</th><th class="num">Paper</th><th class="num">Plates</th><th class="num">Machine</th><th class="num">Finish</th><th class="num">Overhead + profit</th><th class="num">Total</th><th class="num">Fill</th></tr></thead><tbody>`;
   plan.sets.forEach((s, i) => {
     const c = plan!.costs[i];
-    html += `<tr><td>${s.id}</td><td>${s.jobIds.map((id) => esc(id)).join(", ")}</td><td class="num">${int(s.sheets)}</td><td class="num">${int(c.sheetsBought)}</td><td class="num">${c.plateCount}</td><td class="num">${money(c.paper)}</td><td class="num">${money(c.plates)}</td><td class="num">${money(c.machine)}</td><td class="num">${money(c.finishing)}</td><td class="num">${money(c.overhead + c.profit)}</td><td class="num"><b>${money(c.total)}</b></td><td class="num">${Math.round(s.utilisation * 100)}%</td></tr>`;
+    html += `<tr><td>${s.id}</td><td>${s.jobIds.map((id) => esc(id)).join(", ")}</td><td>${s.jobIds.map((id) => s.ups[id]).join(" + ")}</td><td>${Math.round(s.sheetW)} × ${Math.round(s.sheetH)}</td><td class="num">${s.ratio}</td><td class="num">${int(s.sheets)}</td><td class="num">${int(c.sheetsBought)}</td><td class="num">${c.plateCount}</td><td class="num">${money(c.paper)}</td><td class="num">${money(c.plates)}</td><td class="num">${money(c.machine)}</td><td class="num">${money(c.finishing)}</td><td class="num">${money(c.overhead + c.profit)}</td><td class="num"><b>${money(c.total)}</b></td><td class="num">${Math.round(s.utilisation * 100)}%</td></tr>`;
   });
   html += `</tbody></table><h3>Jobs</h3><table><thead><tr><th>Job</th><th>Set</th><th class="num">Qty</th><th class="num">Ups</th><th class="num">Printed</th><th class="num">Extra</th><th class="num">Cost</th><th class="num">Per piece</th></tr></thead><tbody>`;
   plan.sets.forEach((s, i) => {
@@ -339,7 +365,7 @@ function renderResults(): void {
 }
 
 function drawPreview(svg: SVGSVGElement, set: SheetSet, mirror: boolean): void {
-  const S = settings;
+  const S = withSheet(settings, set);
   svg.setAttribute("viewBox", `0 0 ${S.sheetW} ${S.sheetH}`);
   const A = printArea(S);
   const jobIndex = new Map(jobs.map((j, i) => [j.id, i]));
@@ -357,7 +383,15 @@ function drawPreview(svg: SVGSVGElement, set: SheetSet, mirror: boolean): void {
     const fs = Math.max(4, Math.min(c.w, c.h) / 7);
     if (c.w > 14 && c.h > 14) out += `<text x="${c.x + c.w / 2}" y="${c.y + c.h / 2}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" fill="#111" ${c.rot ? `transform="rotate(90 ${c.x + c.w / 2} ${c.y + c.h / 2})"` : ""}>${esc(c.jobId.slice(0, 14))}</text>`;
   }
-  out += `<text x="${S.sheetW / 2}" y="${S.gripper - 3}" font-size="7" text-anchor="middle" fill="#555">GRIPPER – ${S.sheetW} × ${S.sheetH} mm</text>`;
+  // cut marks: vertical ticks for vertical cuts (top, bottom), horizontal ticks for horizontal cuts (left, right)
+  const cl = cutLines(S, cells);
+  const g = 1.5;
+  const l = 3.5;
+  let marks = "";
+  for (const x of cl.xs) marks += `M${x} ${Math.max(0, cl.minY - g - l)}V${Math.max(0, cl.minY - g)}M${x} ${cl.maxY + g}V${Math.min(S.sheetH, cl.maxY + g + l)}`;
+  for (const y of cl.ys) marks += `M${Math.max(0, cl.minX - g - l)} ${y}H${Math.max(0, cl.minX - g)}M${cl.maxX + g} ${y}H${Math.min(S.sheetW, cl.maxX + g + l)}`;
+  out += `<path d="${marks}" fill="none" stroke="#c0152f" stroke-width="0.4"/>`;
+  out += `<text x="${S.sheetW / 2}" y="${S.gripper - 3}" font-size="7" text-anchor="middle" fill="#555">GRIPPER – ${Math.round(S.sheetW)} × ${Math.round(S.sheetH)} mm – ratio ${set.ratio}</text>`;
   svg.innerHTML = out;
 }
 
@@ -378,12 +412,12 @@ async function exportCsv(): Promise<void> {
     }
   });
   rows.push([]);
-  rows.push(["Set", "Sheets run", "Sheets to buy", "Plates", "Paper", "Plates cost", "Machine", "Finishing", "Overhead", "Profit", "Total"]);
+  rows.push(["Set", "Sheet mm", "Ratio", "Sheets run", "Sheets to buy", "Plates", "Paper", "Plates cost", "Machine", "Finishing", "Overhead", "Profit", "Total"]);
   plan.sets.forEach((s, i) => {
     const c = plan!.costs[i];
-    rows.push([s.id, s.sheets, c.sheetsBought, c.plateCount, c.paper.toFixed(2), c.plates.toFixed(2), c.machine.toFixed(2), c.finishing.toFixed(2), c.overhead.toFixed(2), c.profit.toFixed(2), c.total.toFixed(2)]);
+    rows.push([s.id, `${Math.round(s.sheetW)}x${Math.round(s.sheetH)}`, s.ratio, s.sheets, c.sheetsBought, c.plateCount, c.paper.toFixed(2), c.plates.toFixed(2), c.machine.toFixed(2), c.finishing.toFixed(2), c.overhead.toFixed(2), c.profit.toFixed(2), c.total.toFixed(2)]);
   });
-  rows.push(["Grand total", "", "", "", "", "", "", "", "", "", plan.total.toFixed(2)]);
+  rows.push(["Grand total", "", "", "", "", "", "", "", "", "", "", "", plan.total.toFixed(2)]);
   const text = "﻿" + rows.map((r) => r.map(csvCell).join(",")).join("\r\n");
   if (await saveText("costing.csv", text, "csv", "CSV")) setStatus("Costing CSV saved");
 }
@@ -405,6 +439,18 @@ async function exportPdf(): Promise<void> {
 }
 
 // ---------- wiring ----------
+const upsCols = $<HTMLInputElement>("ups-cols");
+const upsRows = $<HTMLInputElement>("ups-rows");
+upsCols.value = String(settings.upsCols);
+upsRows.value = String(settings.upsRows);
+upsCols.addEventListener("input", () => {
+  settings.upsCols = Math.max(0, Math.floor(Number(upsCols.value) || 0));
+  changed();
+});
+upsRows.addEventListener("input", () => {
+  settings.upsRows = Math.max(0, Math.floor(Number(upsRows.value) || 0));
+  changed();
+});
 const filePdf = $<HTMLInputElement>("file-pdf");
 const fileFolder = $<HTMLInputElement>("file-folder");
 $("btn-add").addEventListener("click", () => filePdf.click());
@@ -427,6 +473,8 @@ $("btn-csv").addEventListener("click", () => void exportCsv());
 $("btn-pdf").addEventListener("click", () => void exportPdf());
 $("btn-reset").addEventListener("click", () => {
   settings = { ...DEFAULT_SETTINGS };
+  upsCols.value = String(settings.upsCols);
+  upsRows.value = String(settings.upsRows);
   buildSettings();
   changed();
 });
