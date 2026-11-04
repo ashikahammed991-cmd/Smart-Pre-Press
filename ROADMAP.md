@@ -11,6 +11,16 @@
 - [x] Ratio and press-sheet size worked out from the ups (cut from the parent sheet), per sheet set
 - [x] Cut marks for every horizontal and vertical cut
 
+## v1.3 - combine sizes (done)
+- [x] The total ups are shared between the sizes; PDFs are merged onto shared plates when that lowers the total cost
+- [x] Guillotine (row/column) layouts and cut marks for mixed sizes
+
+## v1.4 - fewest plates (done)
+- [x] "Combine for": fewest plates (default) or lowest cost; same-size jobs with different quantities (e.g. sizes 32-40) share one plate set
+
+## v1.5 - same ups and sheet on every plate (done)
+- [x] Every plate set carries exactly the typed total ups, on one press sheet / ratio for the whole job
+
 ## Next
 - [ ] Separate C / M / Y / K plate PDFs (bundled separation engine)
 - [ ] Several press-sheet sizes: pick the cheapest automatically

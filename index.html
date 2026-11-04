@@ -25,7 +25,7 @@
       <aside id="jobs-pane">
         <h2>Jobs</h2>
         <div id="ups-box">
-          <div class="ups-title">Ups on the sheet</div>
+          <div class="ups-title">Total ups on one sheet</div>
           <div class="ups-row">
             <input type="number" id="ups-cols" min="1" step="1" title="Copies across the sheet" />
             <span>×</span>
@@ -34,7 +34,7 @@
             <b id="ups-total">0</b>
             <span>ups</span>
           </div>
-          <div class="hint">Columns × rows, e.g. 3 × 6 = 18. The ratio, press sheet, plates and cut marks follow from this. The same ups are used for every PDF.</div>
+          <div class="hint">Columns × rows, e.g. 3 × 6 = 18. In "Combine sizes" mode the program shares these ups between the sizes (by quantity) and puts as many PDFs as pays off on the same plates, so the plates, ratio and cost come out lowest. A PDF on its own plates uses all the ups.</div>
         </div>
         <div id="jobs-empty" class="hint">Add the PDFs (or a whole folder), then type the quantity for each one. Trim size is read from the PDF TrimBox (or MediaBox).</div>
         <table id="jobs">

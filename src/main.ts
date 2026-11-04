@@ -1,6 +1,6 @@
 import "./style.css";
 import { effectiveRatio, autoRatio } from "./engine/cost";
-import { cutLines, makePlan, printArea, withSheet } from "./engine/plan";
+import { cutMarks, makePlan, printArea, withSheet } from "./engine/plan";
 import { DEFAULT_SETTINGS } from "./engine/types";
 import type { Job, Placement, Plan, Settings, SheetSet } from "./engine/types";
 import { saveBytes, saveText } from "./io";
@@ -19,8 +19,8 @@ let side: "front" | "back" = "front";
 
 function loadSettings(): Settings {
   try {
-    const raw = localStorage.getItem("spp-settings-v2");
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw), mode: "step" };
+    const raw = localStorage.getItem("spp-settings-v4");
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
   } catch {
     /* storage unavailable */
   }
@@ -28,7 +28,7 @@ function loadSettings(): Settings {
 }
 function saveSettings(): void {
   try {
-    localStorage.setItem("spp-settings-v2", JSON.stringify(settings));
+    localStorage.setItem("spp-settings-v4", JSON.stringify(settings));
   } catch {
     /* storage unavailable */
   }
@@ -44,12 +44,14 @@ interface Field {
   key: keyof Settings;
   label: string;
   unit?: string;
-  kind?: "num" | "bool" | "text" | "mode" | "sheetmode";
+  kind?: "num" | "bool" | "text" | "mode" | "sheetmode" | "priority";
 }
 const SECTIONS: { title: string; fields: Field[] }[] = [
   {
     title: "Mode",
     fields: [
+      { key: "mode", label: "PDFs", kind: "mode" },
+      { key: "priority", label: "Combine for", kind: "priority" },
       { key: "sheetMode", label: "Press sheet", kind: "sheetmode" },
       { key: "allowRotate", label: "Allow 90° rotation", kind: "bool" },
     ],
@@ -117,10 +119,18 @@ function buildSettings(): void {
       let input: HTMLInputElement | HTMLSelectElement;
       if (f.kind === "mode") {
         input = document.createElement("select");
-        input.innerHTML = `<option value="step">Each job on its own sheet</option><option value="gang">Gang run (share sheets)</option>`;
-        input.value = settings.mode === "gang" ? "gang" : "step";
+        input.innerHTML = `<option value="gang">Combine into shared plates</option><option value="step">Each PDF on its own plates</option>`;
+        input.value = settings.mode === "step" ? "step" : "gang";
         input.addEventListener("change", () => {
           settings.mode = (input as HTMLSelectElement).value as Settings["mode"];
+          changed();
+        });
+      } else if (f.kind === "priority") {
+        input = document.createElement("select");
+        input.innerHTML = `<option value="plates">Fewest plates (more sheets are fine)</option><option value="cost">Lowest total cost</option>`;
+        input.value = settings.priority;
+        input.addEventListener("change", () => {
+          settings.priority = (input as HTMLSelectElement).value as Settings["priority"];
           changed();
         });
       } else if (f.kind === "sheetmode") {
@@ -241,11 +251,9 @@ function changed(rebuildNow = true): void {
   timer = window.setTimeout(recompute, rebuildNow ? 120 : 250);
 }
 
-/** Every job gets the ups typed in the Ups box (columns x rows). */
+/** The jobs as the planner sees them (the ups are shared out by the planner, see engine/plan.ts). */
 function planJobs(): Job[] {
-  const cols = Math.max(0, Math.floor(settings.upsCols));
-  const rows = Math.max(0, Math.floor(settings.upsRows));
-  return jobs.map((j) => ({ ...j, ups: cols * rows, cols }));
+  return jobs.map((j) => ({ ...j }));
 }
 
 function recompute(): void {
@@ -384,12 +392,9 @@ function drawPreview(svg: SVGSVGElement, set: SheetSet, mirror: boolean): void {
     if (c.w > 14 && c.h > 14) out += `<text x="${c.x + c.w / 2}" y="${c.y + c.h / 2}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" fill="#111" ${c.rot ? `transform="rotate(90 ${c.x + c.w / 2} ${c.y + c.h / 2})"` : ""}>${esc(c.jobId.slice(0, 14))}</text>`;
   }
   // cut marks: vertical ticks for vertical cuts (top, bottom), horizontal ticks for horizontal cuts (left, right)
-  const cl = cutLines(S, cells);
-  const g = 1.5;
-  const l = 3.5;
-  let marks = "";
-  for (const x of cl.xs) marks += `M${x} ${Math.max(0, cl.minY - g - l)}V${Math.max(0, cl.minY - g)}M${x} ${cl.maxY + g}V${Math.min(S.sheetH, cl.maxY + g + l)}`;
-  for (const y of cl.ys) marks += `M${Math.max(0, cl.minX - g - l)} ${y}H${Math.max(0, cl.minX - g)}M${cl.maxX + g} ${y}H${Math.min(S.sheetW, cl.maxX + g + l)}`;
+  const marks = cutMarks(S, cells)
+    .map((g) => `M${g.x1} ${g.y1}L${g.x2} ${g.y2}`)
+    .join("");
   out += `<path d="${marks}" fill="none" stroke="#c0152f" stroke-width="0.4"/>`;
   out += `<text x="${S.sheetW / 2}" y="${S.gripper - 3}" font-size="7" text-anchor="middle" fill="#555">GRIPPER – ${Math.round(S.sheetW)} × ${Math.round(S.sheetH)} mm – ratio ${set.ratio}</text>`;
   svg.innerHTML = out;

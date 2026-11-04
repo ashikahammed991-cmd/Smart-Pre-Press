@@ -1,5 +1,5 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, cmyk, concatTransformationMatrix, drawObject, popGraphicsState, pushGraphicsState } from "pdf-lib";
-import { cutLines, printArea, withSheet } from "./engine/plan";
+import { cutMarks, printArea, withSheet } from "./engine/plan";
 import type { Job, Placement, Plan, Settings, SheetSet } from "./engine/types";
 
 const PT = 72 / 25.4; // 1 mm in PDF points
@@ -149,22 +149,13 @@ function drawBlank(page: PDFPage, p: Placement, S: Settings): void {
 
 function drawMarks(page: PDFPage, S: Settings, cells: Placement[], set: SheetSet, side: "front" | "back", font: PDFFont): void {
   const A = printArea(S);
-  const { xs, ys, minX, maxX, minY, maxY } = cutLines(S, cells);
+  const minY = Math.min(...cells.map((c) => c.y));
+  const maxY = Math.max(...cells.map((c) => c.y + c.h));
   const line = (x1: number, y1: number, x2: number, y2: number) =>
     page.drawLine({ start: { x: x1 * PT, y: (S.sheetH - y1) * PT }, end: { x: x2 * PT, y: (S.sheetH - y2) * PT }, thickness: 0.25, color: REG });
 
-  // cut marks at every cut: vertical ticks (top and bottom) for the vertical cuts,
-  // horizontal ticks (left and right) for the horizontal cuts, just outside the printed block
-  const gap = 1.5;
-  const len = 3.5;
-  for (const x of xs) {
-    line(x, Math.max(0, minY - gap - len), x, Math.max(0, minY - gap));
-    line(x, maxY + gap, x, Math.min(S.sheetH, maxY + gap + len));
-  }
-  for (const y of ys) {
-    line(Math.max(0, minX - gap - len), y, Math.max(0, minX - gap), y);
-    line(maxX + gap, y, Math.min(S.sheetW, maxX + gap + len), y);
-  }
+  // cut marks: ticks at every cut (see cutMarks in engine/plan.ts)
+  for (const sg of cutMarks(S, cells)) line(sg.x1, sg.y1, sg.x2, sg.y2);
 
   // registration targets: left, right and top centre
   const target = (cx: number, cy: number) => {

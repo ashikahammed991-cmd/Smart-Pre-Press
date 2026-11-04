@@ -20,7 +20,11 @@ export type PlanMode = "step" | "gang";
 /** auto = the press sheet is cut from the parent sheet to fit the ups; fixed = always the sheet size below. */
 export type SheetMode = "auto" | "fixed";
 
+/** What "combine sizes" optimises: plates = as few plate sets as possible (more sheets are fine); cost = lowest total cost. */
+export type Priority = "plates" | "cost";
+
 export interface Settings {
+  priority: Priority;
   /** Ups on every sheet: copies across (columns) x copies down (rows), typed by the user. */
   upsCols: number;
   upsRows: number;
@@ -134,6 +138,7 @@ export interface Plan {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  priority: "plates",
   upsCols: 3,
   upsRows: 6,
   sheetMode: "auto",
@@ -148,7 +153,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bleed: 3,
   gutter: 0,
   allowRotate: true,
-  mode: "step",
+  mode: "gang",
   parentW: 584,
   parentH: 914,
   parentPrice: 40,
