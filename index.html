@@ -15,8 +15,11 @@
           <button id="btn-clear" title="Remove all jobs">Clear</button>
         </div>
         <div class="group">
+          <button id="btn-run" class="primary" title="Work out ups, ratio, plates and cost, and show the plates">▶ Run</button>
+        </div>
+        <div class="group">
           <button id="btn-csv" title="Save the costing as a CSV file">Export costing CSV</button>
-          <button id="btn-pdf" class="primary" title="Build the imposed, print-ready PDF">Export plate PDF</button>
+          <button id="btn-pdf" title="Build the imposed, print-ready PDF">Export plate PDF</button>
         </div>
         <input type="file" id="file-pdf" accept=".pdf,application/pdf" multiple hidden />
         <input type="file" id="file-folder" webkitdirectory multiple hidden />
@@ -37,8 +40,8 @@
       <main id="centre">
         <div id="warnings"></div>
         <div id="summary"></div>
-        <div id="tabs"></div>
-        <div id="preview-wrap"><svg id="preview" xmlns="http://www.w3.org/2000/svg"></svg></div>
+        <div id="stale">Settings or quantities changed – press <b>Run</b> to update the plates.</div>
+        <div id="boards"></div>
         <div id="tables"></div>
       </main>
 

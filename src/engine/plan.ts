@@ -173,6 +173,8 @@ function packGroup(S: Settings, group: Job[], A: Area): Placement[] | null {
       sh.n++;
     }
     if (!ok) continue;
+    // the typed Rows x Columns must be kept exactly: every row holds the typed number of columns
+    if (Number.isFinite(maxPer) && (shelves.some((s) => s.n !== maxPer) || (S.upsRows > 0 && shelves.length !== Math.floor(S.upsRows)))) continue;
     const last = shelves[shelves.length - 1];
     const used = last.y + last.h;
     if (!best || used < best.used - EPS) best = { used, out };

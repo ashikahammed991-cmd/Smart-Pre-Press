@@ -69,3 +69,9 @@ td.num, th.num { text-align: right; }
 .ups-line b { font-size: 18px; }
 details.advanced { border-top: 1px solid var(--line); padding-top: 8px; }
 details.advanced > summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; color: var(--muted, #9aa3b2); }
+
+#boards { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; }
+.board { background: #0e1014; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.board .bh { font-size: 11px; color: #9aa3b2; margin-bottom: 6px; max-width: 300px; }
+.board svg.bsvg { height: 380px; width: auto; max-width: 300px; display: block; background: #fff; }
+#stale { display: none; background: #4a3a10; border: 1px solid #a8801f; color: #ffe08a; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; }

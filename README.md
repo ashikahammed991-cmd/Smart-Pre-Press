@@ -41,3 +41,7 @@ Releases are built by GitHub Actions: push a tag such as `v1.0.0` and installers
 The previous Illustrator-style editor is kept in the Git history (tag `v0.8.0`).
 
 MIT licensed.
+
+## v1.7
+- **Run** button: nothing is planned until you press Run. Afterwards every plate (sheet side) is shown as an artboard; Export PDF / CSV use exactly these plates. Changing anything marks the result as out of date until Run is pressed again.
+- Typed Rows × Columns is now strictly kept (every row has exactly the typed number of columns).

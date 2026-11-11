@@ -14,8 +14,6 @@ let settings: Settings = loadSettings();
 const jobs: Job[] = [];
 const sources = new Map<string, Uint8Array>();
 let plan: Plan | null = null;
-let tab = 0;
-let side: "front" | "back" = "front";
 
 function loadSettings(): Settings {
   try {
@@ -274,10 +272,23 @@ async function addFiles(files: File[]): Promise<void> {
 
 // ---------- planning and results ----------
 let timer = 0;
-function changed(rebuildNow = true): void {
+function changed(_rebuildNow = true): void {
   saveSettings();
   window.clearTimeout(timer);
-  timer = window.setTimeout(recompute, rebuildNow ? 120 : 250);
+  timer = window.setTimeout(markStale, 60);
+}
+
+let stale = false;
+/** Inputs changed after a run: keep the plates on screen but say they are out of date. */
+function markStale(): void {
+  const totalEl = document.getElementById("ups-total");
+  if (totalEl) totalEl.textContent = String(Math.max(0, Math.floor(settings.upsCols)) * Math.max(0, Math.floor(settings.upsRows)));
+  stale = !!plan;
+  $("btn-pdf").toggleAttribute("disabled", !plan || stale);
+  $("btn-csv").toggleAttribute("disabled", !plan || stale);
+  $("stale").style.display = stale ? "block" : "none";
+  $("btn-run").classList.toggle("primary", true);
+  if (stale) setStatus("Settings changed – press Run to update the plates");
 }
 
 /** The jobs as the planner sees them (the ups are shared out by the planner, see engine/plan.ts). */
@@ -300,21 +311,19 @@ function recompute(): void {
     plan = null;
     setStatus(`Planning failed: ${(err as Error).message}`);
   }
-  if (plan && tab >= plan.sets.length) tab = 0;
+  stale = false;
+  $("stale").style.display = "none";
   renderResults();
 }
 
 function renderResults(): void {
   const warn = $("warnings");
   const summary = $("summary");
-  const tabs = $("tabs");
   const tables = $("tables");
   warn.innerHTML = "";
   summary.innerHTML = "";
-  tabs.innerHTML = "";
+  $("boards").innerHTML = "";
   tables.innerHTML = "";
-  const svg = $("preview") as unknown as SVGSVGElement;
-  svg.innerHTML = "";
 
   const addWarn = (t: string, bad = false) => {
     const d = document.createElement("div");
@@ -348,39 +357,30 @@ function renderResults(): void {
     card("Cost per piece", pieces ? money(plan.total / pieces) : "–") +
     card("Layout", plan.mode === "gang" ? "Gang run" : "Step & repeat") +
     card("Sheet sets", String(plan.sets.length)) +
+    card("Plates (PDF pages)", String(plan.sets.reduce((t, x) => t + (x.hasBack ? 2 : 1), 0))) +
     card("Press sheets to buy", int(bought)) +
     card("Parent sheets", int(plan.costs.reduce((t, c) => t + c.parentSheets, 0))) +
-    card("Plates", String(plates));
+    card("Colour plates (CMYK)", String(plates));
 
-  // tabs
-  plan.sets.forEach((s, i) => {
-    const b = document.createElement("button");
-    b.textContent = `Set ${s.id}`;
-    b.className = i === tab ? "on" : "";
-    b.addEventListener("click", () => {
-      tab = i;
-      renderResults();
-    });
-    tabs.appendChild(b);
-  });
-  const cur = plan.sets[tab];
-  if (cur.hasBack) {
-    const sep = document.createElement("span");
-    sep.className = "sep";
-    tabs.appendChild(sep);
-    for (const sd of ["front", "back"] as const) {
-      const b = document.createElement("button");
-      b.textContent = sd === "front" ? "Front" : "Back (turned)";
-      b.className = side === sd ? "on" : "";
-      b.addEventListener("click", () => {
-        side = sd;
-        renderResults();
-      });
-      tabs.appendChild(b);
+  // artboards: one per sheet side, exactly the pages of the exported PDF
+  const boards = $("boards");
+  let n = 0;
+  for (const set of plan.sets) {
+    for (const sd of set.hasBack ? (["front", "back"] as const) : (["front"] as const)) {
+      n++;
+      const card = document.createElement("div");
+      card.className = "board";
+      const head = document.createElement("div");
+      head.className = "bh";
+      head.textContent = `Plate ${n} – Set ${set.id} ${set.hasBack ? (sd === "front" ? "front" : "back (turned)") : ""} – ${Math.round(set.sheetW)} × ${Math.round(set.sheetH)} mm – ratio ${set.ratio} – ${int(set.sheets)} sheets`;
+      const sv = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      sv.setAttribute("class", "bsvg");
+      drawPreview(sv as SVGSVGElement, set, sd === "back");
+      card.appendChild(head);
+      card.appendChild(sv);
+      boards.appendChild(card);
     }
-  } else side = "front";
-
-  drawPreview(svg, cur, side === "back" && cur.hasBack);
+  }
 
   // tables
   const jobById = new Map(jobs.map((j, i) => [j.id, { j, i }]));
@@ -491,7 +491,14 @@ $("btn-clear").addEventListener("click", () => {
   jobs.length = 0;
   sources.clear();
   renderJobs();
-  changed();
+  plan = null;
+  stale = false;
+  $("stale").style.display = "none";
+  renderResults();
+});
+$("btn-run").addEventListener("click", () => {
+  window.clearTimeout(timer);
+  recompute();
 });
 $("btn-csv").addEventListener("click", () => void exportCsv());
 $("btn-pdf").addEventListener("click", () => void exportPdf());
@@ -503,4 +510,5 @@ $("btn-reset").addEventListener("click", () => {
 
 buildSettings();
 renderJobs();
-recompute();
+markStale();
+renderResults();
