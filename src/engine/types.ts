@@ -58,6 +58,8 @@ export interface Settings {
   ratio: number;
   spoilSheets: number;
   spoilPct: number;
+  /** Most extra (waste) pieces allowed when sets are merged, as % of the pieces printed. */
+  maxWastePct: number;
   // plates and machine
   colorsFront: number;
   colorsBack: number;
@@ -167,6 +169,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ratio: 0,
   spoilSheets: 50,
   spoilPct: 3,
+  maxWastePct: 5,
   colorsFront: 4,
   colorsBack: 4,
   plateCost: 450,

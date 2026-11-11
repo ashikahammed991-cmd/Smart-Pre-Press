@@ -322,6 +322,18 @@ function planGang(S: Settings, jobs: Job[], strict = false): { sets: SheetSet[];
   const map = new Map(jobs.map((j) => [j.id, j]));
   const costOf = (s: SheetSet) => setCost(S, s, map).total;
   type G = { jobs: Job[]; set: SheetSet; cost: number };
+  /** Extra pieces printed beyond the quantities, and total printed, for one set. */
+  const extra = (g: G) => {
+    let ex = 0;
+    let pr = 0;
+    for (const j of g.jobs) {
+      const printed = g.set.sheets * (g.set.ups[j.id] ?? 0);
+      ex += Math.max(0, printed - j.qty);
+      pr += printed;
+    }
+    return { ex, pr };
+  };
+  const limit = Math.max(0, S.maxWastePct) / 100;
   let groups: G[] = [];
   const unplaced: string[] = [];
   for (const j of jobs) {
@@ -352,7 +364,16 @@ function planGang(S: Settings, jobs: Job[], strict = false): { sets: SheetSet[];
         if (!g) continue;
         const saving = groups[i].cost + groups[k].cost - g.cost;
         // "plates": merge whenever it fits (fewest plate sets), the cheapest merge first; "cost": only merges that save money
-        const worth = S.priority === "cost" ? saving > 1e-9 : true;
+        let worth = S.priority === "cost" ? saving > 1e-9 : true;
+        if (worth && S.priority !== "cost") {
+          // do not merge if it makes the paper waste exceed the limit (more plates are then fine)
+          const m = extra(g);
+          const A = extra(groups[i]);
+          const B = extra(groups[k]);
+          const before = (A.ex + B.ex) / Math.max(1, A.pr + B.pr);
+          const after = m.ex / Math.max(1, m.pr);
+          worth = after <= limit + 1e-9 || after < before - 1e-9;
+        }
         if (worth && (!best || saving > best.saving)) best = { i, k, g, saving };
       }
     }

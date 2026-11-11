@@ -17,7 +17,7 @@ let plan: Plan | null = null;
 
 function loadSettings(): Settings {
   try {
-    const raw = localStorage.getItem("spp-settings-v4");
+    const raw = localStorage.getItem("spp-settings-v5");
     if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
   } catch {
     /* storage unavailable */
@@ -26,7 +26,7 @@ function loadSettings(): Settings {
 }
 function saveSettings(): void {
   try {
-    localStorage.setItem("spp-settings-v4", JSON.stringify(settings));
+    localStorage.setItem("spp-settings-v5", JSON.stringify(settings));
   } catch {
     /* storage unavailable */
   }
@@ -55,6 +55,7 @@ const PRIMARY: Field[] = [
   { key: "gapY", label: "Vertical GAP", unit: "mm" },
   { key: "markLen", label: "Cutting Mark LENGTH", unit: "mm" },
   { key: "markGap", label: "Cutting Mark GAP", unit: "mm" },
+  { key: "maxWastePct", label: "Max paper waste", unit: "%" },
 ];
 const SECTIONS: { title: string; fields: Field[] }[] = [
   {
@@ -349,7 +350,6 @@ function renderResults(): void {
   $("btn-csv").toggleAttribute("disabled", false);
 
   const bought = plan.costs.reduce((t, c) => t + c.sheetsBought, 0);
-  const plates = plan.costs.reduce((t, c) => t + c.plateCount, 0);
   const pieces = jobs.filter((j) => j.qty > 0).reduce((t, j) => t + j.qty, 0);
   const card = (k: string, v: string) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`;
   summary.innerHTML =
@@ -357,10 +357,9 @@ function renderResults(): void {
     card("Cost per piece", pieces ? money(plan.total / pieces) : "–") +
     card("Layout", plan.mode === "gang" ? "Gang run" : "Step & repeat") +
     card("Sheet sets", String(plan.sets.length)) +
-    card("Plates (PDF pages)", String(plan.sets.reduce((t, x) => t + (x.hasBack ? 2 : 1), 0))) +
+    card("Plates", String(plan.sets.reduce((t, x) => t + (x.hasBack ? 2 : 1), 0))) +
     card("Press sheets to buy", int(bought)) +
-    card("Parent sheets", int(plan.costs.reduce((t, c) => t + c.parentSheets, 0))) +
-    card("Colour plates (CMYK)", String(plates));
+    card("Parent sheets", int(plan.costs.reduce((t, c) => t + c.parentSheets, 0)));
 
   // artboards: one per sheet side, exactly the pages of the exported PDF
   const boards = $("boards");

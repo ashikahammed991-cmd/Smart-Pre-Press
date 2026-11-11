@@ -45,3 +45,7 @@ MIT licensed.
 ## v1.7
 - **Run** button: nothing is planned until you press Run. Afterwards every plate (sheet side) is shown as an artboard; Export PDF / CSV use exactly these plates. Changing anything marks the result as out of date until Run is pressed again.
 - Typed Rows × Columns is now strictly kept (every row has exactly the typed number of columns).
+
+## v1.7.1
+- "Max paper waste (%)" option: sets are merged into fewer plates only while the extra printed pieces stay under this limit; when waste would grow, more plates are used (same ups and ratio on all).
+- Colour plates are no longer counted; "Plates" = the plate artboards. CMYK separation happens when the PDF is output.
