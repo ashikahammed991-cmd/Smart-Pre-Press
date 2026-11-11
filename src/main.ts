@@ -1,6 +1,6 @@
 import "./style.css";
 import { effectiveRatio, autoRatio } from "./engine/cost";
-import { cutMarks, makePlan, printArea, withSheet } from "./engine/plan";
+import { cutMarks, geom, makePlan, printArea, withSheet } from "./engine/plan";
 import { DEFAULT_SETTINGS } from "./engine/types";
 import type { Job, Placement, Plan, Settings, SheetSet } from "./engine/types";
 import { saveBytes, saveText } from "./io";
@@ -45,7 +45,19 @@ interface Field {
   label: string;
   unit?: string;
   kind?: "num" | "bool" | "text" | "mode" | "sheetmode" | "priority";
+  /** Whole numbers only. */
+  int?: boolean;
 }
+
+/** The settings that are always visible (same as the Illustrator plate dialog); the rest sit under "Advanced". */
+const PRIMARY: Field[] = [
+  { key: "upsRows", label: "Rows (Downwards)", int: true },
+  { key: "upsCols", label: "Columns (Rightwards)", int: true },
+  { key: "gapX", label: "Horizontal GAP", unit: "mm" },
+  { key: "gapY", label: "Vertical GAP", unit: "mm" },
+  { key: "markLen", label: "Cutting Mark LENGTH", unit: "mm" },
+  { key: "markGap", label: "Cutting Mark GAP", unit: "mm" },
+];
 const SECTIONS: { title: string; fields: Field[] }[] = [
   {
     title: "Mode",
@@ -68,7 +80,6 @@ const SECTIONS: { title: string; fields: Field[] }[] = [
       { key: "marginBottom", label: "Bottom margin", unit: "mm" },
       { key: "barH", label: "Colour-bar strip", unit: "mm" },
       { key: "bleed", label: "Bleed", unit: "mm" },
-      { key: "gutter", label: "Gap between jobs", unit: "mm" },
     ],
   },
   {
@@ -104,78 +115,96 @@ const SECTIONS: { title: string; fields: Field[] }[] = [
   },
 ];
 
+function renderField(parent: HTMLElement, f: Field): void {
+  const row = document.createElement("div");
+  row.className = "row" + (f.kind === "bool" ? " check" : "");
+  const lab = document.createElement("label");
+  lab.textContent = f.label + (f.unit ? ` (${f.unit})` : "");
+  let input: HTMLInputElement | HTMLSelectElement;
+  if (f.kind === "mode") {
+    input = document.createElement("select");
+    input.innerHTML = `<option value="gang">Combine into shared plates</option><option value="step">Each PDF on its own plates</option>`;
+    input.value = settings.mode === "step" ? "step" : "gang";
+    input.addEventListener("change", () => {
+      settings.mode = (input as HTMLSelectElement).value as Settings["mode"];
+      changed();
+    });
+  } else if (f.kind === "priority") {
+    input = document.createElement("select");
+    input.innerHTML = `<option value="plates">Fewest plates (more sheets are fine)</option><option value="cost">Lowest total cost</option>`;
+    input.value = settings.priority;
+    input.addEventListener("change", () => {
+      settings.priority = (input as HTMLSelectElement).value as Settings["priority"];
+      changed();
+    });
+  } else if (f.kind === "sheetmode") {
+    input = document.createElement("select");
+    input.innerHTML = `<option value="auto">Auto: cut to fit the ups</option><option value="fixed">Fixed size</option>`;
+    input.value = settings.sheetMode;
+    input.addEventListener("change", () => {
+      settings.sheetMode = (input as HTMLSelectElement).value as Settings["sheetMode"];
+      changed();
+    });
+  } else if (f.kind === "bool") {
+    input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = !!settings[f.key];
+    input.addEventListener("change", () => {
+      (settings[f.key] as boolean) = (input as HTMLInputElement).checked;
+      changed();
+    });
+  } else if (f.kind === "text") {
+    input = document.createElement("input");
+    input.type = "text";
+    input.value = String(settings[f.key]);
+    input.addEventListener("input", () => {
+      (settings[f.key] as string) = (input as HTMLInputElement).value;
+      changed();
+    });
+  } else {
+    input = document.createElement("input");
+    input.type = "number";
+    input.step = f.int ? "1" : "any";
+    input.min = "0";
+    input.id = `s-${f.key}`;
+    input.value = String(settings[f.key]);
+    input.addEventListener("input", () => {
+      const v = Number((input as HTMLInputElement).value);
+      if (Number.isFinite(v) && v >= 0) {
+        (settings[f.key] as number) = f.int ? Math.floor(v) : v;
+        changed();
+      }
+    });
+  }
+  row.append(lab, input);
+  parent.appendChild(row);
+}
+
 function buildSettings(): void {
   const root = $("settings");
   root.innerHTML = "";
+  const title = document.createElement("div");
+  title.className = "plate-title";
+  title.textContent = "Plate layout settings";
+  root.appendChild(title);
+  for (const f of PRIMARY) renderField(root, f);
+  const total = document.createElement("div");
+  total.className = "ups-line";
+  total.innerHTML = `UPS: <b id="ups-total">0</b>`;
+  root.appendChild(total);
+
+  const adv = document.createElement("details");
+  adv.className = "advanced";
+  const sum = document.createElement("summary");
+  sum.textContent = "Advanced (sheet sizes, paper, plates, costing)";
+  adv.appendChild(sum);
   for (const sec of SECTIONS) {
     const h = document.createElement("h3");
     h.textContent = sec.title;
-    root.appendChild(h);
-    for (const f of sec.fields) {
-      const row = document.createElement("div");
-      row.className = "row" + (f.kind === "bool" ? " check" : "");
-      const lab = document.createElement("label");
-      lab.textContent = f.label + (f.unit ? ` (${f.unit})` : "");
-      let input: HTMLInputElement | HTMLSelectElement;
-      if (f.kind === "mode") {
-        input = document.createElement("select");
-        input.innerHTML = `<option value="gang">Combine into shared plates</option><option value="step">Each PDF on its own plates</option>`;
-        input.value = settings.mode === "step" ? "step" : "gang";
-        input.addEventListener("change", () => {
-          settings.mode = (input as HTMLSelectElement).value as Settings["mode"];
-          changed();
-        });
-      } else if (f.kind === "priority") {
-        input = document.createElement("select");
-        input.innerHTML = `<option value="plates">Fewest plates (more sheets are fine)</option><option value="cost">Lowest total cost</option>`;
-        input.value = settings.priority;
-        input.addEventListener("change", () => {
-          settings.priority = (input as HTMLSelectElement).value as Settings["priority"];
-          changed();
-        });
-      } else if (f.kind === "sheetmode") {
-        input = document.createElement("select");
-        input.innerHTML = `<option value="auto">Auto: cut to fit the ups</option><option value="fixed">Fixed size</option>`;
-        input.value = settings.sheetMode;
-        input.addEventListener("change", () => {
-          settings.sheetMode = (input as HTMLSelectElement).value as Settings["sheetMode"];
-          changed();
-        });
-      } else if (f.kind === "bool") {
-        input = document.createElement("input");
-        input.type = "checkbox";
-        input.checked = !!settings[f.key];
-        input.addEventListener("change", () => {
-          (settings[f.key] as boolean) = (input as HTMLInputElement).checked;
-          changed();
-        });
-      } else if (f.kind === "text") {
-        input = document.createElement("input");
-        input.type = "text";
-        input.value = String(settings[f.key]);
-        input.addEventListener("input", () => {
-          (settings[f.key] as string) = (input as HTMLInputElement).value;
-          changed();
-        });
-      } else {
-        input = document.createElement("input");
-        input.type = "number";
-        input.step = "any";
-        input.min = "0";
-        input.id = `s-${f.key}`;
-        input.value = String(settings[f.key]);
-        input.addEventListener("input", () => {
-          const v = Number((input as HTMLInputElement).value);
-          if (Number.isFinite(v) && v >= 0) {
-            (settings[f.key] as number) = v;
-            changed();
-          }
-        });
-      }
-      row.append(lab, input);
-      root.appendChild(row);
-    }
+    adv.appendChild(h);
+    for (const f of sec.fields) renderField(adv, f);
   }
+  root.appendChild(adv);
   const note = document.createElement("div");
   note.className = "hint";
   note.id = "ratio-note";
@@ -297,7 +326,7 @@ function renderResults(): void {
   if (A.W <= 0 || A.H <= 0) addWarn("The margins leave no printable area on the press sheet.", true);
   const noQty = jobs.filter((j) => j.qty <= 0).map((j) => j.name);
   if (noQty.length) addWarn(`No quantity entered for: ${noQty.join(", ")}`);
-  if (Math.floor(settings.upsCols) * Math.floor(settings.upsRows) <= 0) addWarn("Type the ups (columns × rows) above the job list.", true);
+  if (Math.floor(settings.upsCols) * Math.floor(settings.upsRows) <= 0) addWarn("Type the Rows and Columns in the plate layout settings.", true);
   if (!plan || !plan.sets.length) {
     if (plan?.unplaced.length) addWarn(`${settings.upsCols} × ${settings.upsRows} ups do not fit on the largest sheet (with bleed and margins) for: ${plan.unplaced.join(", ")}`, true);
     $("btn-pdf").toggleAttribute("disabled", true);
@@ -376,6 +405,7 @@ function drawPreview(svg: SVGSVGElement, set: SheetSet, mirror: boolean): void {
   const S = withSheet(settings, set);
   svg.setAttribute("viewBox", `0 0 ${S.sheetW} ${S.sheetH}`);
   const A = printArea(S);
+  const gm = geom(S);
   const jobIndex = new Map(jobs.map((j, i) => [j.id, i]));
   const cells: Placement[] = set.placements.map((p) => (mirror ? { ...p, x: S.sheetW - p.x - p.w } : p));
   let out = `<rect x="0" y="0" width="${S.sheetW}" height="${S.sheetH}" fill="#fff"/>`;
@@ -387,7 +417,7 @@ function drawPreview(svg: SVGSVGElement, set: SheetSet, mirror: boolean): void {
     const blank = mirror && job && job.pages < 2;
     const col = `hsl(${hue(i)} 65% 60%)`;
     out += `<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" fill="${blank ? "#f4f4f4" : col}" fill-opacity="0.55" stroke="${col}" stroke-width="0.5"/>`;
-    out += `<rect x="${c.x + S.bleed}" y="${c.y + S.bleed}" width="${Math.max(0, c.w - 2 * S.bleed)}" height="${Math.max(0, c.h - 2 * S.bleed)}" fill="none" stroke="#111" stroke-width="0.6"/>`;
+    out += `<rect x="${c.x + gm.bx}" y="${c.y + gm.by}" width="${Math.max(0, c.w - 2 * gm.bx)}" height="${Math.max(0, c.h - 2 * gm.by)}" fill="none" stroke="#111" stroke-width="0.6"/>`;
     const fs = Math.max(4, Math.min(c.w, c.h) / 7);
     if (c.w > 14 && c.h > 14) out += `<text x="${c.x + c.w / 2}" y="${c.y + c.h / 2}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" fill="#111" ${c.rot ? `transform="rotate(90 ${c.x + c.w / 2} ${c.y + c.h / 2})"` : ""}>${esc(c.jobId.slice(0, 14))}</text>`;
   }
@@ -444,18 +474,7 @@ async function exportPdf(): Promise<void> {
 }
 
 // ---------- wiring ----------
-const upsCols = $<HTMLInputElement>("ups-cols");
-const upsRows = $<HTMLInputElement>("ups-rows");
-upsCols.value = String(settings.upsCols);
-upsRows.value = String(settings.upsRows);
-upsCols.addEventListener("input", () => {
-  settings.upsCols = Math.max(0, Math.floor(Number(upsCols.value) || 0));
-  changed();
-});
-upsRows.addEventListener("input", () => {
-  settings.upsRows = Math.max(0, Math.floor(Number(upsRows.value) || 0));
-  changed();
-});
+
 const filePdf = $<HTMLInputElement>("file-pdf");
 const fileFolder = $<HTMLInputElement>("file-folder");
 $("btn-add").addEventListener("click", () => filePdf.click());
@@ -478,8 +497,6 @@ $("btn-csv").addEventListener("click", () => void exportCsv());
 $("btn-pdf").addEventListener("click", () => void exportPdf());
 $("btn-reset").addEventListener("click", () => {
   settings = { ...DEFAULT_SETTINGS };
-  upsCols.value = String(settings.upsCols);
-  upsRows.value = String(settings.upsRows);
   buildSettings();
   changed();
 });

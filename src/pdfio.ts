@@ -1,5 +1,5 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, cmyk, concatTransformationMatrix, drawObject, popGraphicsState, pushGraphicsState } from "pdf-lib";
-import { cutMarks, printArea, withSheet } from "./engine/plan";
+import { cutMarks, geom, printArea, withSheet } from "./engine/plan";
 import type { Job, Placement, Plan, Settings, SheetSet } from "./engine/types";
 
 const PT = 72 / 25.4; // 1 mm in PDF points
@@ -60,8 +60,9 @@ export async function buildImposedPdf(S0: Settings, plan: Plan, jobs: Job[], sou
   const srcs = new Map<string, Src>();
   const embedded = new Map<string, Awaited<ReturnType<PDFDocument["embedPage"]>>>();
 
-  const getEmbedded = async (jobId: string, pageIndex: number) => {
-    const key = `${jobId}:${pageIndex}`;
+  const { bx, by } = geom(S0);
+  const getEmbedded = async (jobId: string, pageIndex: number, rot: boolean) => {
+    const key = `${jobId}:${pageIndex}:${rot ? 1 : 0}`;
     const have = embedded.get(key);
     if (have) return have;
     let src = srcs.get(jobId);
@@ -73,8 +74,10 @@ export async function buildImposedPdf(S0: Settings, plan: Plan, jobs: Job[], sou
     }
     const page = src.doc.getPage(Math.min(pageIndex, src.doc.getPageCount() - 1));
     const t = page.getTrimBox();
-    const b = S0.bleed * PT;
-    const e = await out.embedPage(page, { left: t.x - b, bottom: t.y - b, right: t.x + t.width + b, top: t.y + t.height + b });
+    // bleed on the artwork's own axes: when the cell is turned 90° the sheet's X bleed is the artwork's Y bleed
+    const ax = (rot ? by : bx) * PT;
+    const ay = (rot ? bx : by) * PT;
+    const e = await out.embedPage(page, { left: t.x - ax, bottom: t.y - ay, right: t.x + t.width + ax, top: t.y + t.height + ay });
     embedded.set(key, e);
     return e;
   };
@@ -101,7 +104,7 @@ export async function buildImposedPdf(S0: Settings, plan: Plan, jobs: Job[], sou
           drawBlank(page, p, S);
           continue;
         }
-        const e = await getEmbedded(p.jobId, pageIndex);
+        const e = await getEmbedded(p.jobId, pageIndex, p.rot);
         const prot = rotationOf(p.jobId, pageIndex);
         placeForm(page, e, prot, p, S);
       }
@@ -142,9 +145,10 @@ function placeForm(page: PDFPage, e: { ref: unknown; width: number; height: numb
 }
 
 function drawBlank(page: PDFPage, p: Placement, S: Settings): void {
-  const x = (p.x + S.bleed) * PT;
-  const y = (S.sheetH - p.y - p.h + S.bleed) * PT;
-  page.drawRectangle({ x, y, width: (p.w - 2 * S.bleed) * PT, height: (p.h - 2 * S.bleed) * PT, borderColor: REG, borderWidth: 0.25 });
+  const { bx, by } = geom(S);
+  const x = (p.x + bx) * PT;
+  const y = (S.sheetH - p.y - p.h + by) * PT;
+  page.drawRectangle({ x, y, width: (p.w - 2 * bx) * PT, height: (p.h - 2 * by) * PT, borderColor: REG, borderWidth: 0.25 });
 }
 
 function drawMarks(page: PDFPage, S: Settings, cells: Placement[], set: SheetSet, side: "front" | "back", font: PDFFont): void {

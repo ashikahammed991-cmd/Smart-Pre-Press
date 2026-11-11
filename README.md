@@ -6,7 +6,7 @@ Press automation for print shops: drop in the customer PDFs, type the quantities
 
 1. **Add PDFs or a whole folder.** The trim size comes from each PDF's TrimBox (MediaBox if there is none) and `/Rotate` is respected.
 2. **Type the quantity** for every job.
-3. **You type the total ups once**, as columns × rows (e.g. 3 × 6 = 18), above the job list, and the quantity of each PDF. The program does the rest:
+3. **You type the total ups once**, as rows × columns (e.g. 3 × 6 = 18), above the job list, and the quantity of each PDF. The program does the rest:
    - *Combine into shared plates* (default): PDFs are merged onto shared plates. "Combine for: Fewest plates" (default) merges as long as the ups allow, even if that prints more sheets; "Lowest total cost" merges only when that saves money. The ups are shared between the sizes by quantity so every size finishes together. Layouts are always cuttable with straight cuts (rows first, then columns).
    - *Each PDF on its own plates*: every PDF uses all the ups.
    - **Every plate set has exactly the typed total ups and the same press sheet**, so the whole job has one ratio. (Spare ups go to the sizes that need them most.)
@@ -19,7 +19,7 @@ The artwork is **not re-rendered**: pages are embedded as they are, so vectors s
 
 ## Settings
 
-Everything is in millimetres: press sheet, gripper, margins, bleed, gap, parent sheet, ratio (0 = calculated from the sizes), spoilage, plates, machine rates, finishing, overhead and profit percentages, currency symbol. Settings are remembered between runs.
+The settings panel shows only the plate layout (like the Illustrator plate dialog): **Rows, Columns, Horizontal GAP, Vertical GAP, Cutting Mark LENGTH, Cutting Mark GAP**, and the total ups. The gap is the distance between trim edges; bleed is shrunk to fit inside it. Everything else (press sheet limits, parent sheet and ratio, plates, machine, finishing, overhead, profit, currency) is under **Advanced**, with sensible defaults. All lengths are in millimetres. Settings are remembered between runs.
 
 ## Known limits
 

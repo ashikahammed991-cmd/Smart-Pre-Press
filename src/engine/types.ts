@@ -42,8 +42,12 @@ export interface Settings {
   /** Height of the colour-bar / slug strip kept free at the bottom. */
   barH: number;
   bleed: number;
-  /** Extra space between neighbouring cells (beyond the bleed). */
-  gutter: number;
+  /** Distance between neighbouring trim edges, across (X) and down (Y). Bleed is shrunk to fit inside it. */
+  gapX: number;
+  gapY: number;
+  /** Cut marks: tick length, and distance from the printed block. */
+  markLen: number;
+  markGap: number;
   allowRotate: boolean;
   mode: PlanMode;
   // paper
@@ -151,7 +155,10 @@ export const DEFAULT_SETTINGS: Settings = {
   marginBottom: 6,
   barH: 10,
   bleed: 3,
-  gutter: 0,
+  gapX: 5,
+  gapY: 5,
+  markLen: 6,
+  markGap: 2,
   allowRotate: true,
   mode: "gang",
   parentW: 584,

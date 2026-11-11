@@ -9,19 +9,38 @@ interface Area {
   y0: number;
 }
 
+/**
+ * Bleed and gutter actually used on the sheet. The gap is measured between trim edges, so each cell
+ * only gets as much bleed as fits half the gap; gx / gy are the space left between the bleed boxes.
+ */
+export function geom(S: Settings): { bx: number; by: number; gx: number; gy: number } {
+  const bx = Math.max(0, Math.min(S.bleed, S.gapX / 2));
+  const by = Math.max(0, Math.min(S.bleed, S.gapY / 2));
+  return { bx, by, gx: Math.max(0, S.gapX - 2 * bx), gy: Math.max(0, S.gapY - 2 * by) };
+}
+
 export function printArea(S: Settings): Area {
+  // room for the cut marks outside the block, whatever small margins were typed
+  const markRoom = S.markGap + S.markLen;
+  const side = Math.max(S.marginSide, markRoom);
+  const top = Math.max(S.gripper, markRoom);
+  const bottom = Math.max(S.marginBottom, markRoom);
   return {
-    W: S.sheetW - 2 * S.marginSide,
-    H: S.sheetH - S.gripper - S.marginBottom - S.barH,
-    x0: S.marginSide,
-    y0: S.gripper,
+    W: S.sheetW - 2 * side,
+    H: S.sheetH - top - bottom - S.barH,
+    x0: side,
+    y0: top,
   };
 }
 
 /** Settings with the press sheet of one set filled in (the sheet differs per set in auto mode). */
 export const withSheet = (S: Settings, set: { sheetW: number; sheetH: number }): Settings => ({ ...S, sheetW: set.sheetW, sheetH: set.sheetH });
 
-const cell = (S: Settings, j: Job) => ({ w: j.w + 2 * S.bleed, h: j.h + 2 * S.bleed });
+/** A job's cell on the sheet: trim plus bleed (turned 90° if rot; the bleed stays horizontal / vertical on the sheet). */
+const cell = (S: Settings, j: Job, rot = false) => {
+  const { bx, by } = geom(S);
+  return rot ? { w: j.h + 2 * bx, h: j.w + 2 * by } : { w: j.w + 2 * bx, h: j.h + 2 * by };
+};
 const EPS = 1e-6;
 
 interface Sheet {
@@ -64,17 +83,16 @@ interface Grid {
 
 /** Every grid of `ups` cells (columns x rows, last row may be short) that fits in the printable area. */
 function grids(S: Settings, job: Job, A: Area): Grid[] {
-  const c = cell(S, job);
+  const { gx, gy } = geom(S);
   const out: Grid[] = [];
   const ups = job.ups;
-  for (const rot of S.allowRotate && Math.abs(c.w - c.h) > EPS ? [false, true] : [false]) {
-    const cw = rot ? c.h : c.w;
-    const ch = rot ? c.w : c.h;
+  for (const rot of S.allowRotate && Math.abs(job.w - job.h) > EPS ? [false, true] : [false]) {
+    const { w: cw, h: ch } = cell(S, job, rot);
     for (let nx = 1; nx <= ups; nx++) {
       if (job.cols > 0 && nx !== job.cols) continue;
       const ny = Math.ceil(ups / nx);
-      const bw = nx * cw + (nx - 1) * S.gutter;
-      const bh = ny * ch + (ny - 1) * S.gutter;
+      const bw = nx * cw + (nx - 1) * gx;
+      const bh = ny * ch + (ny - 1) * gy;
       if (bw <= A.W + EPS && bh <= A.H + EPS) out.push({ nx, ny, rot, exact: nx * ny === ups, bw, bh });
     }
   }
@@ -83,16 +101,15 @@ function grids(S: Settings, job: Job, A: Area): Grid[] {
 
 /** Place the cells of a grid in reading order, centred in the printable area. */
 function gridPlacements(S: Settings, job: Job, g: Grid, A: Area): Placement[] {
-  const c = cell(S, job);
-  const cw = g.rot ? c.h : c.w;
-  const ch = g.rot ? c.w : c.h;
+  const { gx, gy } = geom(S);
+  const { w: cw, h: ch } = cell(S, job, g.rot);
   const x0 = A.x0 + (A.W - g.bw) / 2;
   const y0 = A.y0 + (A.H - g.bh) / 2;
   const out: Placement[] = [];
   for (let i = 0; i < job.ups; i++) {
     const col = i % g.nx;
     const row = Math.floor(i / g.nx);
-    out.push({ jobId: job.id, x: x0 + col * (cw + S.gutter), y: y0 + row * (ch + S.gutter), w: cw, h: ch, rot: g.rot });
+    out.push({ jobId: job.id, x: x0 + col * (cw + gx), y: y0 + row * (ch + gy), w: cw, h: ch, rot: g.rot });
   }
   return out;
 }
@@ -116,19 +133,24 @@ function centre(ps: Placement[], A: Area): Placement[] {
  */
 function packGroup(S: Settings, group: Job[], A: Area): Placement[] | null {
   type Cell = { id: string; w: number; h: number; rot: boolean };
-  const base: { id: string; w: number; h: number }[] = [];
+  type Base = { id: string; w: number; h: number; rw: number; rh: number };
+  const { gx, gy } = geom(S);
+  // at most as many cells in a row as the typed number of columns
+  const maxPer = S.upsCols > 0 ? Math.floor(S.upsCols) : Infinity;
+  const base: Base[] = [];
   for (const j of group) {
     const c = cell(S, j);
-    for (let i = 0; i < j.ups; i++) base.push({ id: j.id, w: c.w, h: c.h });
+    const r = cell(S, j, true);
+    for (let i = 0; i < j.ups; i++) base.push({ id: j.id, w: c.w, h: c.h, rw: r.w, rh: r.h });
   }
-  const strategies: ((c: { w: number; h: number }) => boolean)[] = [() => false];
+  const strategies: ((c: Base) => boolean)[] = [() => false];
   if (S.allowRotate) strategies.push(() => true, (c) => c.h > c.w, (c) => c.w > c.h);
 
   let best: { used: number; out: Placement[] } | null = null;
   for (const turn of strategies) {
-    const cells: Cell[] = base.map((c) => (turn(c) ? { id: c.id, w: c.h, h: c.w, rot: true } : { ...c, rot: false }));
+    const cells: Cell[] = base.map((c) => (turn(c) ? { id: c.id, w: c.rw, h: c.rh, rot: true } : { id: c.id, w: c.w, h: c.h, rot: false }));
     cells.sort((a, b) => b.h - a.h || a.id.localeCompare(b.id, undefined, { numeric: true }) || b.w - a.w);
-    const shelves: { y: number; h: number; x: number }[] = [];
+    const shelves: { y: number; h: number; x: number; n: number }[] = [];
     const out: Placement[] = [];
     let ok = true;
     for (const c of cells) {
@@ -136,18 +158,19 @@ function packGroup(S: Settings, group: Job[], A: Area): Placement[] | null {
         ok = false;
         break;
       }
-      let sh = shelves.find((s) => c.h <= s.h + EPS && s.x + c.w <= A.W + EPS);
+      let sh = shelves.find((s) => c.h <= s.h + EPS && s.x + c.w <= A.W + EPS && s.n < maxPer);
       if (!sh) {
-        const y = shelves.length ? shelves[shelves.length - 1].y + shelves[shelves.length - 1].h + S.gutter : 0;
+        const y = shelves.length ? shelves[shelves.length - 1].y + shelves[shelves.length - 1].h + gy : 0;
         if (y + c.h > A.H + EPS) {
           ok = false;
           break;
         }
-        sh = { y, h: c.h, x: 0 };
+        sh = { y, h: c.h, x: 0, n: 0 };
         shelves.push(sh);
       }
       out.push({ jobId: c.id, x: A.x0 + sh.x, y: A.y0 + sh.y, w: c.w, h: c.h, rot: c.rot });
-      sh.x += c.w + S.gutter;
+      sh.x += c.w + gx;
+      sh.n++;
     }
     if (!ok) continue;
     const last = shelves[shelves.length - 1];
@@ -185,7 +208,7 @@ function fit(S: Settings, group: Job[]): Fit | null {
     const Ss = { ...S, sheetW: sh.w, sheetH: sh.h };
     const A = printArea(Ss);
     if (A.W <= 0 || A.H <= 0) continue;
-    const need = group.reduce((t, j) => t + cell(S, j).w * cell(S, j).h * j.ups, 0);
+    const need = group.reduce((t, j) => t + Math.min(cell(S, j).w * cell(S, j).h, cell(S, j, true).w * cell(S, j, true).h) * j.ups, 0);
     if (need > A.W * A.H + EPS) continue; // cannot fit by area alone
     const p = packGroup(Ss, group, A);
     if (p) return { sheet: sh, placements: p };
@@ -393,8 +416,9 @@ export interface Seg {
 export function cutMarks(S: Settings, cells: Placement[]): Seg[] {
   if (!cells.length) return [];
   const r = (v: number) => Math.round(v * 100) / 100;
-  const gap = 1.5;
-  const len = 3.5;
+  const gap = S.markGap;
+  const len = S.markLen;
+  const { bx, by } = geom(S);
   const minX = Math.min(...cells.map((c) => c.x));
   const maxX = Math.max(...cells.map((c) => c.x + c.w));
   const minY = Math.min(...cells.map((c) => c.y));
@@ -404,9 +428,9 @@ export function cutMarks(S: Settings, cells: Placement[]): Seg[] {
   const rows = new Map<number, Placement[]>();
   for (const c of cells) rows.set(r(c.y), [...(rows.get(r(c.y)) ?? []), c]);
   const rowList = [...rows.entries()].sort((a, b) => a[0] - b[0]).map(([, cs]) => ({
-    top: Math.min(...cs.map((c) => c.y)) + S.bleed,
-    bottom: Math.max(...cs.map((c) => c.y + c.h)) - S.bleed,
-    xs: [...new Set(cs.flatMap((c) => [r(c.x + S.bleed), r(c.x + c.w - S.bleed)]))].sort((a, b) => a - b),
+    top: Math.min(...cs.map((c) => c.y)) + by,
+    bottom: Math.max(...cs.map((c) => c.y + c.h)) - by,
+    xs: [...new Set(cs.flatMap((c) => [r(c.x + bx), r(c.x + c.w - bx)]))].sort((a, b) => a - b),
   }));
 
   const segs: Seg[] = [];
@@ -430,7 +454,7 @@ export function cutMarks(S: Settings, cells: Placement[]): Seg[] {
     }
     return segs;
   }
-  const inBleed = Math.max(0.8, Math.min(len, S.bleed - 0.4));
+  const inBleed = Math.max(0.8, Math.min(len, by - 0.4));
   rowList.forEach((row, i) => {
     for (const x of row.xs) {
       if (i === 0) segs.push({ x1: x, y1: Math.max(0, minY - gap - len), x2: x, y2: Math.max(0, minY - gap) });

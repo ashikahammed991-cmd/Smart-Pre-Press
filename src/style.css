@@ -62,3 +62,10 @@ td.num, th.num { text-align: right; }
 .row small { color: var(--dim); }
 .row.check { grid-template-columns: 1fr auto; }
 #statusbar { grid-column: 1 / 4; background: var(--panel); border-top: 1px solid var(--line); padding: 3px 12px; color: var(--dim); }
+
+/* ---------- plate layout (right panel) ---------- */
+.plate-title { font-weight: 600; margin: 2px 0 10px; }
+.ups-line { text-align: right; margin: 8px 2px 14px; font-size: 14px; }
+.ups-line b { font-size: 18px; }
+details.advanced { border-top: 1px solid var(--line); padding-top: 8px; }
+details.advanced > summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; color: var(--muted, #9aa3b2); }

@@ -21,6 +21,11 @@
 ## v1.5 - same ups and sheet on every plate (done)
 - [x] Every plate set carries exactly the typed total ups, on one press sheet / ratio for the whole job
 
+## v1.6 - short settings panel (done)
+- [x] Plate layout settings as in the Illustrator dialog: rows, columns, horizontal / vertical gap, cutting mark length and gap
+- [x] Columns are respected (e.g. 4 across x 3 down); gap is measured between trim edges
+- [x] Everything else moved under "Advanced"
+
 ## Next
 - [ ] Separate C / M / Y / K plate PDFs (bundled separation engine)
 - [ ] Several press-sheet sizes: pick the cheapest automatically
