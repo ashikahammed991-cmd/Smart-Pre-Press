@@ -49,3 +49,7 @@ MIT licensed.
 ## v1.7.1
 - "Max paper waste (%)" option: sets are merged into fewer plates only while the extra printed pieces stay under this limit; when waste would grow, more plates are used (same ups and ratio on all).
 - Colour plates are no longer counted; "Plates" = the plate artboards. CMYK separation happens when the PDF is output.
+
+## v1.7.2
+- CSV simplified: Plate no, Size, Quantity, Ups, Sheet run, Printed, Extra (+ a Total row per plate).
+- "Show plate previews" checkbox hides/shows the plate artboards.

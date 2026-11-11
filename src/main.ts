@@ -324,6 +324,8 @@ function renderResults(): void {
   warn.innerHTML = "";
   summary.innerHTML = "";
   $("boards").innerHTML = "";
+  $("show-prev").parentElement!.style.display = "none";
+  $("boards").style.display = ($("show-prev") as HTMLInputElement).checked ? "flex" : "none";
   tables.innerHTML = "";
 
   const addWarn = (t: string, bad = false) => {
@@ -363,6 +365,7 @@ function renderResults(): void {
 
   // artboards: one per sheet side, exactly the pages of the exported PDF
   const boards = $("boards");
+  $("show-prev").parentElement!.style.display = "flex";
   let n = 0;
   for (const set of plan.sets) {
     for (const sd of set.hasBack ? (["front", "back"] as const) : (["front"] as const)) {
@@ -437,21 +440,24 @@ function csvCell(v: string | number): string {
 
 async function exportCsv(): Promise<void> {
   if (!plan) return;
-  const rows: (string | number)[][] = [["Set", "Job", "Width mm", "Height mm", "Qty", "Ups", "Sheets run", "Printed", "Extra", "Job cost", "Per piece"]];
+  const rows: (string | number)[][] = [["Plate no", "Size", "Quantity", "Ups", "Sheet run", "Printed", "Extra"]];
   const byId = new Map(jobs.map((j) => [j.id, j]));
   plan.sets.forEach((s, i) => {
+    let q = 0;
+    let u = 0;
+    let pr = 0;
+    let ex = 0;
     for (const jc of plan!.costs[i].jobs) {
-      const j = byId.get(jc.jobId);
-      rows.push([s.id, jc.jobId, j?.w ?? "", j?.h ?? "", j?.qty ?? "", jc.ups, s.sheets, jc.printed, jc.surplus, jc.cost.toFixed(2), jc.perPiece.toFixed(4)]);
+      const qty = byId.get(jc.jobId)?.qty ?? 0;
+      rows.push([s.id, jc.jobId, qty, jc.ups, s.sheets, jc.printed, jc.surplus]);
+      q += qty;
+      u += jc.ups;
+      pr += jc.printed;
+      ex += jc.surplus;
     }
+    rows.push([s.id, "Total", q, u, s.sheets, pr, ex]);
+    rows.push([]);
   });
-  rows.push([]);
-  rows.push(["Set", "Sheet mm", "Ratio", "Sheets run", "Sheets to buy", "Plates", "Paper", "Plates cost", "Machine", "Finishing", "Overhead", "Profit", "Total"]);
-  plan.sets.forEach((s, i) => {
-    const c = plan!.costs[i];
-    rows.push([s.id, `${Math.round(s.sheetW)}x${Math.round(s.sheetH)}`, s.ratio, s.sheets, c.sheetsBought, c.plateCount, c.paper.toFixed(2), c.plates.toFixed(2), c.machine.toFixed(2), c.finishing.toFixed(2), c.overhead.toFixed(2), c.profit.toFixed(2), c.total.toFixed(2)]);
-  });
-  rows.push(["Grand total", "", "", "", "", "", "", "", "", "", "", "", plan.total.toFixed(2)]);
   const text = "﻿" + rows.map((r) => r.map(csvCell).join(",")).join("\r\n");
   if (await saveText("costing.csv", text, "csv", "CSV")) setStatus("Costing CSV saved");
 }
@@ -494,6 +500,9 @@ $("btn-clear").addEventListener("click", () => {
   stale = false;
   $("stale").style.display = "none";
   renderResults();
+});
+$("show-prev").addEventListener("change", () => {
+  $("boards").style.display = ($("show-prev") as HTMLInputElement).checked ? "flex" : "none";
 });
 $("btn-run").addEventListener("click", () => {
   window.clearTimeout(timer);

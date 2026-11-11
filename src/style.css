@@ -75,3 +75,4 @@ details.advanced > summary { cursor: pointer; font-weight: 600; margin-bottom: 8
 .board .bh { font-size: 11px; color: #9aa3b2; margin-bottom: 6px; max-width: 300px; }
 .board svg.bsvg { height: 380px; width: auto; max-width: 300px; display: block; background: #fff; }
 #stale { display: none; background: #4a3a10; border: 1px solid #a8801f; color: #ffe08a; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; }
+#prev-toggle { display: none; align-items: center; gap: 6px; margin-bottom: 8px; cursor: pointer; }
