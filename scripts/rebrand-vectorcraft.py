@@ -33,12 +33,22 @@ def rename_strings(s):
     return re.sub(r'"[^"\n]*"', lambda m: m.group(0).replace("VectorCraft", NAME), s)
 
 
-# 1. About box: keep the licence attribution, say what this is
+# 1. About box: our name and description; the licence notice (required by MIT / Apache-2.0) stays
 def about(s):
-    return s.replace(
-        "Part of ArtCraft. MIT OR Apache-2.0. Fonts: Source Sans 3, Inter, JetBrains Mono (OFL). Icons: Lucide (ISC) + VectorCraft.",
-        "Smart Pre-Press vector editor, based on the open-source VectorCraft (MIT OR Apache-2.0). Fonts: Source Sans 3, Inter, JetBrains Mono (OFL). Icons: Lucide (ISC).",
+    s = s.replace('tl!("About VectorCraft")', 'tl!("About Smart Pre-Press")')
+    s = s.replace('egui::RichText::new("VectorCraft")', 'egui::RichText::new("Smart Pre-Press")')
+    s = re.sub(
+        r'ui\.label\(crate::i18n::fmt\(\s*tl!\("Version \{version\}[^"]*"\),\s*&\[\("version", env!\("CARGO_PKG_VERSION"\)\)\],\s*\)\);',
+        'ui.label("Vector editor for print and pre-press work.");',
+        s,
+        count=1,
     )
+    s = s.replace('[tl!("About"), tl!("Contributors"), tl!("Models")]', '[tl!("About")]')
+    s = s.replace(
+        "Part of ArtCraft. MIT OR Apache-2.0. Fonts: Source Sans 3, Inter, JetBrains Mono (OFL). Icons: Lucide (ISC) + VectorCraft.",
+        "Based on the open-source VectorCraft, (c) ArtCraft Team and the VectorCraft contributors, MIT OR Apache-2.0. Fonts: Source Sans 3, Inter, JetBrains Mono (OFL). Icons: Lucide (ISC).",
+    )
+    return s
 
 
 patch("crates/ui-egui/src/dialogs/about.rs", about, "About text")
