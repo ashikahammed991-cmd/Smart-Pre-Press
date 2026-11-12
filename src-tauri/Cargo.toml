@@ -1,6 +1,6 @@
 [package]
 name = "smart-pre-press"
-version = "1.8.0"
+version = "1.8.1"
 description = "Smart Pre-Press - open-source vector graphics editor"
 edition = "2021"
 
