@@ -65,3 +65,6 @@ MIT licensed.
 
 ## v1.9.1 – three plans at first start
 First start shows three choices: **Free trial (7 days)**, **30-day licence**, **Lifetime licence**. A 30-day key runs 30 days from the day it is activated (the key must be activated within 90 days of making it). License Maker has the matching options.
+
+## v1.9.2
+Version 1.9.2: Auto Plate (imposition, ratio, costing, plate PDF), Vector Editor tab, licence keys (7-day trial, 30-day, lifetime), distribution folder (installer + portable). Use your own `src/license-public.ts`.
