@@ -1,11 +1,11 @@
 {
   "name": "smart-pre-press",
   "private": true,
-  "version": "1.8.2",
+  "version": "1.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node scripts/copy-editor.mjs",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri"

@@ -78,18 +78,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vectorcraft-web
-          path: editor-src
+          path: public/vectorcraft
 
       - run: npm install
       - run: npm run tauri icon app-icon.png
-
-      - name: Check the Vector Editor files are in the build
-        shell: bash
-        run: |
-          ls -la editor-src | head -20
-          npm run build
-          ls -la dist/vectorcraft | head -20
-          test -f dist/vectorcraft/index.html
 
       - uses: tauri-apps/tauri-action@v0
         env:

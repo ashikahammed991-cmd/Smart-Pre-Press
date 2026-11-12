@@ -540,17 +540,13 @@ renderResults();
     if (view === "vector" && !vcLoaded) {
       vcLoaded = true;
       // the editor is only loaded when first opened (the app is large), then kept alive while switching
-      const miss = (why: string) => {
-        $("vc-missing").hidden = false;
-        $("vc-missing").textContent = `The Vector Editor could not be loaded (${why}).`;
-      };
       fetch("vectorcraft/index.html")
-        .then(async (r) => {
-          const t = await r.text();
-          if (r.ok && /vectorcraft-web|wasm/i.test(t) && !/id="nav-vector"/.test(t)) frame.src = "vectorcraft/index.html";
-          else miss(`status ${r.status}, ${t.length} bytes, ${/id="nav-vector"/.test(t) ? "the app's own page came back, so the editor files are not in this build" : "unexpected content"}`);
+        .then((r) => (r.ok ? r.text() : ""))
+        .then((t) => {
+          if (/wasm|vectorcraft/i.test(t)) frame.src = "vectorcraft/index.html";
+          else $("vc-missing").hidden = false;
         })
-        .catch((e) => miss(String(e)));
+        .catch(() => ($("vc-missing").hidden = false));
     }
   };
   $("nav-vector").addEventListener("click", () => show("vector"));
