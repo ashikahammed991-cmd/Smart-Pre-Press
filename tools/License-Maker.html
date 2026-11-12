@@ -41,7 +41,7 @@
   <div class="row"><div style="flex:1"><label>Customer name</label><input type="text" id="cname" placeholder="Name or shop" /></div></div>
   <div class="row">
     <label><input type="radio" name="t" value="L" checked /> Lifetime</label>
-    <label><input type="radio" name="t" value="M" /> Limited, valid for <input type="number" id="days" value="30" min="1" max="3660" style="width:80px" /> days from today</label>
+    <label><input type="radio" name="t" value="M" /> Limited: runs <input type="number" id="days" value="30" min="1" max="3660" style="width:80px" /> days from the day the customer activates it</label>
   </div>
   <button id="make">Make key</button>
   <textarea id="out" rows="5" readonly placeholder="The key appears here"></textarea>
@@ -63,8 +63,8 @@ async function makeKeyPair() {
 }
 async function signLicense(privB64, name, type, days, now = new Date()) {
   const key = await crypto.subtle.importKey("pkcs8", fromB64u(privB64), { name: "Ed25519" }, false, ["sign"]);
-  const end = new Date(now.getTime() + days * 86400000);
-  const payload = { n: name, t: type, i: ymd(now), e: type === "M" ? ymd(end) : "" };
+  const by = new Date(now.getTime() + 90 * 86400000); // a limited key must be activated within 90 days
+  const payload = type === "M" ? { n: name, t: "M", i: ymd(now), d: days, e: ymd(by) } : { n: name, t: "L", i: ymd(now), e: "" };
   const bytes = new TextEncoder().encode(JSON.stringify(payload));
   const sig = await crypto.subtle.sign({ name: "Ed25519" }, key, bytes);
   return "SPP1." + b64u(bytes) + "." + b64u(sig);
@@ -102,7 +102,7 @@ $("make").onclick = async () => {
   const days = Math.max(1, Math.floor(Number($("days").value) || 30));
   try {
     $("out").value = await signLicense(priv, name, type, days);
-    $("outmsg").innerHTML = '<p class="ok">Key made for ' + name.replace(/</g, "&lt;") + (type === "L" ? " (lifetime)." : " (valid " + days + " days).") + ' Send the whole text.</p>';
+    $("outmsg").innerHTML = '<p class="ok">Key made for ' + name.replace(/</g, "&lt;") + (type === "L" ? " (lifetime)." : " (" + days + " days from activation, activate within 90 days).") + ' Send the whole text.</p>';
   } catch (e) { $("outmsg").innerHTML = '<p class="bad">Could not make the key: ' + e + '</p>'; }
 };
 $("copy").onclick = () => { $("out").select(); navigator.clipboard.writeText($("out").value); };

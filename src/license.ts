@@ -9,6 +9,7 @@ const DAY = 86_400_000;
 const K_START = "spp-trial-start";
 const K_SEEN = "spp-last-seen";
 const K_KEY = "spp-license";
+const K_ACT = "spp-license-start";
 
 export interface LicensePayload {
   /** customer name */
@@ -17,12 +18,14 @@ export interface LicensePayload {
   t: "L" | "M";
   /** issue date YYYY-MM-DD */
   i: string;
-  /** last valid day YYYY-MM-DD ("" for lifetime) */
+  /** limited keys: how many days the licence runs from the day it is activated */
+  d?: number;
+  /** limited keys: the key must be activated by this day YYYY-MM-DD ("" for lifetime) */
   e: string;
 }
 
 export interface LicenseState {
-  status: "licensed" | "trial" | "expired" | "unconfigured";
+  status: "licensed" | "trial" | "expired" | "choose" | "unconfigured";
   /** days left (trial or monthly licence), undefined for lifetime */
   daysLeft?: number;
   type?: "lifetime" | "monthly";
@@ -84,20 +87,19 @@ export async function checkLicense(now = Date.now()): Promise<LicenseState> {
     const p = await verifyKey(key);
     if (p) {
       if (p.t === "L") return { status: "licensed", type: "lifetime", name: p.n, message: `Licensed to ${p.n} – lifetime` };
-      const end = dayEnd(p.e);
+      const act = Number(store(K_ACT) ?? "0") || now;
+      const end = act + (p.d ?? 30) * DAY;
+      const until = new Date(end).toISOString().slice(0, 10);
       if (!tampered && now <= end) {
         const left = Math.max(0, Math.ceil((end - now) / DAY));
-        return { status: "licensed", type: "monthly", name: p.n, until: p.e, daysLeft: left, message: `Licensed to ${p.n} – valid until ${p.e} (${left} days left)` };
+        return { status: "licensed", type: "monthly", name: p.n, until, daysLeft: left, message: `Licensed to ${p.n} – ${left} day${left === 1 ? "" : "s"} left (until ${until})` };
       }
-      return { status: "expired", type: "monthly", name: p.n, until: p.e, message: tampered ? "The computer date was set back. Correct the date, or enter a licence key." : `The licence ended on ${p.e}. Enter a new key.` };
+      return { status: "expired", type: "monthly", name: p.n, until, message: tampered ? "The computer date was set back. Correct the date, or enter a licence key." : `The licence ended on ${until}. Enter a new key.` };
     }
   }
 
-  let start = Number(store(K_START) ?? "0");
-  if (!start) {
-    start = now;
-    store(K_START, String(start));
-  }
+  const start = Number(store(K_START) ?? "0");
+  if (!start) return { status: "choose", message: "Choose how to start: free trial (7 days), or enter a 30-day or lifetime licence key." };
   if (tampered) return { status: "expired", message: "The computer date was set back. Correct the date, or enter a licence key." };
   const used = Math.floor((now - start) / DAY);
   const left = TRIAL_DAYS - used;
@@ -109,7 +111,21 @@ export async function checkLicense(now = Date.now()): Promise<LicenseState> {
 export async function activate(key: string, now = Date.now()): Promise<{ ok: boolean; message: string }> {
   const p = await verifyKey(key);
   if (!p) return { ok: false, message: "This key is not valid. Check that it is copied completely." };
-  if (p.t === "M" && now > dayEnd(p.e)) return { ok: false, message: `This key ended on ${p.e}.` };
-  store(K_KEY, key.trim().replace(/\s+/g, ""));
-  return { ok: true, message: p.t === "L" ? `Activated for ${p.n} – lifetime.` : `Activated for ${p.n} until ${p.e}.` };
+  if (p.t === "M" && p.e && now > dayEnd(p.e)) return { ok: false, message: `This key had to be activated by ${p.e}.` };
+  const clean = key.trim().replace(/\s+/g, "");
+  if (store(K_KEY) !== clean) store(K_ACT, String(now));
+  store(K_KEY, clean);
+  if (p.t === "L") return { ok: true, message: `Activated for ${p.n} – lifetime.` };
+  return { ok: true, message: `Activated for ${p.n}: ${p.d ?? 30} days from today.` };
+}
+
+/** Starts the free trial (once only). */
+export async function startTrial(now = Date.now()): Promise<LicenseState> {
+  if (!Number(store(K_START) ?? "0")) store(K_START, String(now));
+  return checkLicense(now);
+}
+
+/** True when the free trial was already started on this computer. */
+export function trialUsed(): boolean {
+  return !!Number(store(K_START) ?? "0");
 }

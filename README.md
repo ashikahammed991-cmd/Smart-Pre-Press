@@ -62,3 +62,6 @@ MIT licensed.
 - 7-day trial from the first start, then a licence key is needed. Keys: **Lifetime** or **limited** (e.g. 30 days). Offline, signed with Ed25519; the app only holds the public key.
 - Make keys with `tools/License-Maker.html` (open in Chrome/Edge). Step 1 creates the key pair once (keep the private key file secret and backed up; never put it on GitHub). Step 2 makes a key for a customer.
 - Put the downloaded `license-public.ts` into `src/` (replace the file) before building the release.
+
+## v1.9.1 – three plans at first start
+First start shows three choices: **Free trial (7 days)**, **30-day licence**, **Lifetime licence**. A 30-day key runs 30 days from the day it is activated (the key must be activated within 90 days of making it). License Maker has the matching options.

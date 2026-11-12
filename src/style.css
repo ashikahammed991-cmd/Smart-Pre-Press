@@ -102,3 +102,6 @@ details.advanced > summary { cursor: pointer; font-weight: 600; margin-bottom: 8
 #lic-msg { margin-bottom: 10px; color: var(--dim); }
 #lic-msg.good { color: #6fdc8c; }
 #lic-msg.bad { color: #ff7b7b; }
+.lic-plans { display: flex; gap: 8px; margin-bottom: 12px; }
+.lic-plan { flex: 1; padding: 12px 8px; }
+.lic-plan:disabled { opacity: 0.5; }
