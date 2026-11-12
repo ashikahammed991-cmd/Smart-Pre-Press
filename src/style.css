@@ -11,8 +11,8 @@
   --bad: #f2555a;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; }
-#app { display: grid; grid-template-columns: 380px 1fr 300px; grid-template-rows: 46px 1fr 24px; height: 100vh; }
+html, body { margin: 0; height: 100%; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; }
+#app { display: grid; grid-template-columns: 380px 1fr 300px; grid-template-rows: 46px 1fr 24px; flex: 1; min-height: 0; }
 #topbar { grid-column: 1 / 4; display: flex; align-items: center; gap: 14px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .brand { font-weight: 700; color: var(--accent); margin-right: 8px; }
 .brand span { color: var(--dim); font-weight: 400; font-size: 11px; margin-left: 6px; }
@@ -76,3 +76,12 @@ details.advanced > summary { cursor: pointer; font-weight: 600; margin-bottom: 8
 .board svg.bsvg { height: 380px; width: auto; max-width: 300px; display: block; background: #fff; }
 #stale { display: none; background: #4a3a10; border: 1px solid #a8801f; color: #ffe08a; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; }
 #prev-toggle { display: none; align-items: center; gap: 6px; margin-bottom: 8px; cursor: pointer; }
+
+#mainnav { flex: none; height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 10px; background: #101217; border-bottom: 1px solid var(--line); }
+#mainnav .nb { font-weight: 700; color: var(--accent); margin-right: 10px; }
+#mainnav button { border: none; background: none; padding: 6px 14px; border-radius: 6px 6px 0 0; color: var(--dim); }
+#mainnav button.on { background: var(--panel); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+#vc-view { flex: 1; min-height: 0; position: relative; background: #000; }
+#vc-view[hidden], #app[hidden] { display: none; }
+#vc-frame { width: 100%; height: 100%; border: 0; display: block; }
+#vc-missing { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--dim); padding: 20px; text-align: center; }

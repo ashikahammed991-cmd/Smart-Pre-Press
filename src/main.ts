@@ -520,3 +520,42 @@ buildSettings();
 renderJobs();
 markStale();
 renderResults();
+
+// ---------- Vector Editor / Auto Plate switch ----------
+{
+  const app = $("app");
+  const vcView = $("vc-view");
+  const frame = $("vc-frame") as HTMLIFrameElement;
+  let vcLoaded = false;
+  const show = (view: "vector" | "plate") => {
+    app.hidden = view !== "plate";
+    vcView.hidden = view !== "vector";
+    $("nav-vector").classList.toggle("on", view === "vector");
+    $("nav-plate").classList.toggle("on", view === "plate");
+    try {
+      localStorage.setItem("spp-view", view);
+    } catch {
+      /* storage may be unavailable */
+    }
+    if (view === "vector" && !vcLoaded) {
+      vcLoaded = true;
+      // the editor is only loaded when first opened (the app is large), then kept alive while switching
+      fetch("vectorcraft/index.html")
+        .then((r) => (r.ok ? r.text() : ""))
+        .then((t) => {
+          if (/wasm|vectorcraft/i.test(t)) frame.src = "vectorcraft/index.html";
+          else $("vc-missing").hidden = false;
+        })
+        .catch(() => ($("vc-missing").hidden = false));
+    }
+  };
+  $("nav-vector").addEventListener("click", () => show("vector"));
+  $("nav-plate").addEventListener("click", () => show("plate"));
+  let first: "vector" | "plate" = "vector";
+  try {
+    if (localStorage.getItem("spp-view") === "plate") first = "plate";
+  } catch {
+    /* ignore */
+  }
+  show(first);
+}

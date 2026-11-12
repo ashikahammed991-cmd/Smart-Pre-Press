@@ -53,3 +53,7 @@ MIT licensed.
 ## v1.7.2
 - CSV simplified: Plate no, Size, Quantity, Ups, Sheet run, Printed, Extra (+ a Total row per plate).
 - "Show plate previews" checkbox hides/shows the plate artboards.
+
+## v1.8
+- Top bar with two tabs: **Vector Editor** (VectorCraft, built to WebAssembly by the release workflow and loaded from `public/vectorcraft`) and **Auto Plate** (this imposition tool). Both stay alive while you switch.
+- VectorCraft is © its authors, MIT OR Apache-2.0 (https://github.com/storytold/vectorcraft).

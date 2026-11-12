@@ -6,6 +6,15 @@
     <title>Smart Pre-Press</title>
   </head>
   <body>
+    <nav id="mainnav">
+      <span class="nb">Smart Pre-Press</span>
+      <button id="nav-vector" data-view="vector">Vector Editor</button>
+      <button id="nav-plate" data-view="plate">Auto Plate</button>
+    </nav>
+    <div id="vc-view" hidden>
+      <iframe id="vc-frame" title="Vector Editor" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+      <div id="vc-missing" hidden>The Vector Editor is not included in this build (it is added by the release workflow).</div>
+    </div>
     <div id="app">
       <header id="topbar">
         <div class="brand">Smart Pre-Press <span>press automation</span></div>

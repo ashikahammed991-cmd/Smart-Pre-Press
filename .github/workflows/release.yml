@@ -11,7 +11,35 @@ permissions:
   contents: write
 
 jobs:
+  # The Vector Editor tab is VectorCraft (MIT OR Apache-2.0), built for the browser (WebAssembly) and
+  # shipped inside the app. Pinned to VectorCraft v0.21.0; change `ref` to update.
+  vectorcraft-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: storytold/vectorcraft
+          ref: v0.21.0
+          path: vc
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./vc -> target"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk
+      - run: trunk build --release
+        working-directory: vc/apps/vectorcraft-web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vectorcraft-web
+          path: vc/dist/web
+          if-no-files-found: error
+
   build:
+    needs: vectorcraft-web
     strategy:
       fail-fast: false
       matrix:
@@ -46,6 +74,11 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vectorcraft-web
+          path: public/vectorcraft
 
       - run: npm install
       - run: npm run tauri icon app-icon.png
