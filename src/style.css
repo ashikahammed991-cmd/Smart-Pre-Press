@@ -84,4 +84,5 @@ details.advanced > summary { cursor: pointer; font-weight: 600; margin-bottom: 8
 #vc-view { flex: 1; min-height: 0; position: relative; background: #000; }
 #vc-view[hidden], #app[hidden] { display: none; }
 #vc-frame { width: 100%; height: 100%; border: 0; display: block; }
-#vc-missing { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--dim); padding: 20px; text-align: center; }
+#vc-missing[hidden] { display: none; }
+#vc-missing { pointer-events: none; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--dim); padding: 20px; text-align: center; }
