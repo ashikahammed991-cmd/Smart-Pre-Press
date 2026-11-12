@@ -17,10 +17,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           repository: storytold/vectorcraft
           ref: v0.21.0
           path: vc
+      - name: Rebrand the editor as Smart Pre-Press
+        run: python3 scripts/rebrand-vectorcraft.py vc
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
