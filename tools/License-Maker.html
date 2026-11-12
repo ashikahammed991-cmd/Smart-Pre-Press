@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Smart Pre-Press – License Maker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body { font-family: Segoe UI, Arial, sans-serif; background: #14171d; color: #e6e9ef; margin: 0; padding: 24px; }
+  main { max-width: 760px; margin: auto; }
+  h1 { margin-top: 0; }
+  section { background: #1c2028; border: 1px solid #2c3340; border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+  h2 { margin: 0 0 8px; font-size: 17px; }
+  p, label { color: #aab2c0; font-size: 14px; }
+  input[type=text], input[type=number], textarea, input[type=file] { width: 100%; box-sizing: border-box; padding: 8px; background: #101319; color: #e6e9ef; border: 1px solid #2c3340; border-radius: 6px; font-size: 14px; }
+  textarea { font-family: Consolas, monospace; font-size: 12px; }
+  button { background: #3b82f6; color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 14px; cursor: pointer; margin: 8px 8px 0 0; }
+  button.sec { background: #2c3340; }
+  .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  .ok { color: #6fdc8c; } .bad { color: #ff7b7b; }
+  code { background: #101319; padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Smart Pre-Press – License Maker</h1>
+<p>Open this page with a current Chrome or Edge. It works offline and sends nothing anywhere. <b>Keep the private key file only for yourself</b> – anybody who has it can make keys.</p>
+
+<section>
+  <h2>1. Create the key pair (only once)</h2>
+  <p>Press the button. Two files are downloaded: <code>smart-pre-press-PRIVATE-KEY.json</code> (keep it secret, back it up) and <code>license-public.ts</code> (copy it into the project's <code>src</code> folder, replacing the old one, then push to GitHub and build a new version).</p>
+  <p><b>Do this only once.</b> A new pair makes every key you have already given out invalid.</p>
+  <button id="gen">Create key pair</button>
+  <div id="genmsg"></div>
+</section>
+
+<section>
+  <h2>2. Make a licence key</h2>
+  <label>Private key file</label>
+  <input type="file" id="pkfile" accept=".json" />
+  <div id="pkmsg"></div>
+  <div class="row"><div style="flex:1"><label>Customer name</label><input type="text" id="cname" placeholder="Name or shop" /></div></div>
+  <div class="row">
+    <label><input type="radio" name="t" value="L" checked /> Lifetime</label>
+    <label><input type="radio" name="t" value="M" /> Limited, valid for <input type="number" id="days" value="30" min="1" max="3660" style="width:80px" /> days from today</label>
+  </div>
+  <button id="make">Make key</button>
+  <textarea id="out" rows="5" readonly placeholder="The key appears here"></textarea>
+  <button class="sec" id="copy">Copy key</button>
+  <div id="outmsg"></div>
+</section>
+</main>
+
+<script>
+/* ---- core (also tested outside the page) ---- */
+const b64u = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const fromB64u = (s) => { const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)); return Uint8Array.from(b, (c) => c.charCodeAt(0)); };
+const ymd = (d) => { const p = (n) => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); };
+async function makeKeyPair() {
+  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+  const pub = await crypto.subtle.exportKey("raw", pair.publicKey);
+  const priv = await crypto.subtle.exportKey("pkcs8", pair.privateKey);
+  return { pub: b64u(pub), priv: b64u(priv) };
+}
+async function signLicense(privB64, name, type, days, now = new Date()) {
+  const key = await crypto.subtle.importKey("pkcs8", fromB64u(privB64), { name: "Ed25519" }, false, ["sign"]);
+  const end = new Date(now.getTime() + days * 86400000);
+  const payload = { n: name, t: type, i: ymd(now), e: type === "M" ? ymd(end) : "" };
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  const sig = await crypto.subtle.sign({ name: "Ed25519" }, key, bytes);
+  return "SPP1." + b64u(bytes) + "." + b64u(sig);
+}
+/* ---- end core ---- */
+
+const $ = (id) => document.getElementById(id);
+const save = (name, text) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" })); a.download = name; a.click(); };
+let priv = null;
+
+$("gen").onclick = async () => {
+  try {
+    const k = await makeKeyPair();
+    save("smart-pre-press-PRIVATE-KEY.json", JSON.stringify({ app: "Smart Pre-Press", private: k.priv, public: k.pub }, null, 2));
+    setTimeout(() => save("license-public.ts", '// Public half of the licence key pair (safe to keep in GitHub).\nexport const PUBLIC_KEY_B64 = "' + k.pub + '";\n'), 400);
+    $("genmsg").innerHTML = '<p class="ok">Done. Two files were downloaded. Keep the PRIVATE key file safe.</p>';
+  } catch (e) {
+    $("genmsg").innerHTML = '<p class="bad">This browser cannot make the keys (' + e + '). Use the newest Chrome or Edge.</p>';
+  }
+};
+$("pkfile").onchange = async (ev) => {
+  try {
+    const j = JSON.parse(await ev.target.files[0].text());
+    if (!j.private) throw new Error("not a key file");
+    priv = j.private;
+    $("pkmsg").innerHTML = '<p class="ok">Private key loaded.</p>';
+  } catch (e) { priv = null; $("pkmsg").innerHTML = '<p class="bad">That is not the private key file.</p>'; }
+};
+$("make").onclick = async () => {
+  $("outmsg").textContent = "";
+  if (!priv) { $("outmsg").innerHTML = '<p class="bad">Load the private key file first.</p>'; return; }
+  const name = $("cname").value.trim();
+  if (!name) { $("outmsg").innerHTML = '<p class="bad">Type the customer name.</p>'; return; }
+  const type = document.querySelector('input[name=t]:checked').value;
+  const days = Math.max(1, Math.floor(Number($("days").value) || 30));
+  try {
+    $("out").value = await signLicense(priv, name, type, days);
+    $("outmsg").innerHTML = '<p class="ok">Key made for ' + name.replace(/</g, "&lt;") + (type === "L" ? " (lifetime)." : " (valid " + days + " days).") + ' Send the whole text.</p>';
+  } catch (e) { $("outmsg").innerHTML = '<p class="bad">Could not make the key: ' + e + '</p>'; }
+};
+$("copy").onclick = () => { $("out").select(); navigator.clipboard.writeText($("out").value); };
+</script>
+</body>
+</html>

@@ -78,6 +78,7 @@ details.advanced > summary { cursor: pointer; font-weight: 600; margin-bottom: 8
 #prev-toggle { display: none; align-items: center; gap: 6px; margin-bottom: 8px; cursor: pointer; }
 
 #mainnav { flex: none; height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 10px; background: #101217; border-bottom: 1px solid var(--line); }
+#mainnav .logo { border-radius: 5px; flex: none; }
 #mainnav .nb { font-weight: 700; color: var(--accent); margin-right: 10px; }
 #mainnav button { border: none; background: none; padding: 6px 14px; border-radius: 6px 6px 0 0; color: var(--dim); }
 #mainnav button.on { background: var(--panel); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
@@ -86,3 +87,18 @@ details.advanced > summary { cursor: pointer; font-weight: 600; margin-bottom: 8
 #vc-frame { width: 100%; height: 100%; border: 0; display: block; }
 #vc-missing[hidden] { display: none; }
 #vc-missing { pointer-events: none; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--dim); padding: 20px; text-align: center; }
+
+#lic-badge { margin-left: auto; padding: 4px 10px !important; border-radius: 6px !important; font-size: 12px; }
+#lic-badge.lic-trial { color: #ffd166; }
+#lic-badge.lic-licensed { color: #6fdc8c; }
+#lic-badge.lic-expired { color: #ff7b7b; font-weight: 700; }
+#lic-badge.lic-unconfigured { color: var(--dim); }
+#lic-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(8, 10, 14, 0.92); display: flex; align-items: center; justify-content: center; }
+#lic-overlay[hidden] { display: none; }
+.lic-card { width: min(560px, 92vw); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
+.lic-card h2 { margin: 0 0 10px; }
+.lic-card textarea { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 12px; }
+.lic-row { display: flex; gap: 8px; margin-top: 10px; }
+#lic-msg { margin-bottom: 10px; color: var(--dim); }
+#lic-msg.good { color: #6fdc8c; }
+#lic-msg.bad { color: #ff7b7b; }

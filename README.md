@@ -57,3 +57,8 @@ MIT licensed.
 ## v1.8
 - Top bar with two tabs: **Vector Editor** (VectorCraft, built to WebAssembly by the release workflow and copied into the app by `scripts/copy-editor.mjs`) and **Auto Plate** (this imposition tool). Both stay alive while you switch.
 - VectorCraft is © its authors, MIT OR Apache-2.0 (https://github.com/storytold/vectorcraft).
+
+## v1.9 – licence keys
+- 7-day trial from the first start, then a licence key is needed. Keys: **Lifetime** or **limited** (e.g. 30 days). Offline, signed with Ed25519; the app only holds the public key.
+- Make keys with `tools/License-Maker.html` (open in Chrome/Edge). Step 1 creates the key pair once (keep the private key file secret and backed up; never put it on GitHub). Step 2 makes a key for a customer.
+- Put the downloaded `license-public.ts` into `src/` (replace the file) before building the release.
