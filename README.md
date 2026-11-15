@@ -68,3 +68,6 @@ First start shows three choices: **Free trial (7 days)**, **30-day licence**, **
 
 ## v1.9.2
 Version 1.9.2: Auto Plate (imposition, ratio, costing, plate PDF), Vector Editor tab, licence keys (7-day trial, 30-day, lifetime), distribution folder (installer + portable). Use your own `src/license-public.ts`.
+
+## v1.9.4 – Windows fonts in the Vector Editor
+- The Windows fonts (C:\\Windows\\Fonts and your own installed fonts, files up to 15 MB) are loaded into the Vector Editor in the background after it starts, so they appear in its normal font list. The release workflow patches VectorCraft with `window.vectorcraft.addFont` for this.

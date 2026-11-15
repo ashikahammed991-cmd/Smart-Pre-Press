@@ -122,3 +122,27 @@ for rel in ("hicolor/scalable/apps/ai.storyteller.vectorcraft.svg", "vectorcraft
     if (icons / rel).exists():
         shutil.copyfile(here / "icon.svg", icons / rel)
 print("done")
+
+
+# 5. fonts: the web build has no installed fonts, so give the page a way to add them
+#    (window.vectorcraft.addFont(bytes) -> number of faces added). Smart Pre-Press loads the
+#    Windows fonts through it.
+def add_font_api(s):
+    if '"addFont"' in s:
+        return s
+    snippet = '''    set_fn(
+        &obj,
+        "addFont",
+        Closure::<dyn Fn(js_sys::Uint8Array) -> u32>::new(|bytes: js_sys::Uint8Array| {
+            let n = vectorcraft_text::FontDb::global().add_font(bytes.to_vec());
+            repaint();
+            n as u32
+        })
+        .into_js_value(),
+    )?;
+'''
+    i = s.rindex("    Ok(())\n}")
+    return s[:i] + snippet + s[i:]
+
+
+patch("apps/vectorcraft-web/src/api.rs", add_font_api, "window.vectorcraft.addFont")

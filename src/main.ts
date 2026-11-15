@@ -1,4 +1,5 @@
 import "./style.css";
+import { initFonts } from "./fonts";
 import { initLicenseUi } from "./licenseui";
 import { effectiveRatio, autoRatio } from "./engine/cost";
 import { cutMarks, geom, makePlan, printArea, withSheet } from "./engine/plan";
@@ -564,4 +565,5 @@ renderResults();
   }
   show(first);
 }
+initFonts();
 initLicenseUi();
