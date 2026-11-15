@@ -35,14 +35,6 @@ function b64ToBytes(b64: string): Uint8Array {
 const errText = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e));
 
 export function initDataMerge(): void {
-  const nav = document.getElementById("mainnav");
-  if (!nav) return;
-  const btn = document.createElement("button");
-  btn.id = "nav-merge";
-  btn.textContent = "Data Merge";
-  btn.title = "Merge an Excel or CSV file into the open Vector Editor document";
-  nav.appendChild(btn);
-
   const panel = document.createElement("div");
   panel.id = "dm-panel";
   panel.hidden = true;
@@ -110,7 +102,11 @@ export function initDataMerge(): void {
     }
   };
 
-  btn.addEventListener("click", () => (panel.hidden = !panel.hidden));
+  // Window > Data Merge inside the Vector Editor posts {spp:"spp:data-merge"} to this page.
+  window.addEventListener("message", (ev) => {
+    const d = ev.data as { spp?: string } | null;
+    if (d && d.spp === "spp:data-merge") panel.hidden = !panel.hidden;
+  });
   $("dm-close").addEventListener("click", () => (panel.hidden = true));
   $("dm-pick").addEventListener("click", () => $<HTMLInputElement>("dm-file").click());
 

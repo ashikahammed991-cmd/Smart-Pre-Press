@@ -78,3 +78,6 @@ Version 1.9.2: Auto Plate (imposition, ratio, costing, plate PDF), Vector Editor
 
 ## v1.10.1
 - Data Merge reads CSV (UTF-8, or old ANSI) and Excel "Unicode Text" (.txt, UTF-16, tab separated) files, besides .xlsx.
+
+## v1.10.2 – Data Merge in the Window menu
+Data Merge is no longer a button in the top bar. Open it in the Vector Editor: **Window → Data Merge**.

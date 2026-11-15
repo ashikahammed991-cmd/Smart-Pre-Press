@@ -146,3 +146,65 @@ def add_font_api(s):
 
 
 patch("apps/vectorcraft-web/src/api.rs", add_font_api, "window.vectorcraft.addFont")
+
+
+# 6. Window > Data Merge: a menu item that tells the Smart Pre-Press page (the iframe's parent)
+#    to open its Data Merge panel.
+def add_menu_item(s):
+    if '"ui.dataMerge"' in s:
+        return s
+    return s.replace('                c("New Window", "window.newWindow"),\n', '                c("New Window", "window.newWindow"),\n                c("Data Merge", "ui.dataMerge"),\n', 1)
+
+
+def add_menu_command(s):
+    if '"ui.dataMerge"' in s:
+        return s
+    entry = '''    (
+        "ui.dataMerge",
+        "Data Merge",
+        "",
+        "{} open the Data Merge panel of Smart Pre-Press",
+    ),
+'''
+    anchor = '    (\n        "ui.savePerspectivePreset",'
+    return s.replace(anchor, entry + anchor, 1)
+
+
+def add_menu_run(s):
+    if '"ui.dataMerge"' in s:
+        return s
+    anchor = '        "ui.savePerspectivePreset" => crate::dialogs::perspective_grid::open_save(app),\n'
+    new = '''        "ui.dataMerge" => {
+            app.open_url("spp:data-merge");
+            app.ui.status = "Data Merge".into();
+            Ok(Value::Null)
+        }
+'''
+    return s.replace(anchor, new + anchor, 1)
+
+
+def add_open_url_hook(s):
+    if "spp:" in s:
+        return s
+    anchor = "        inbox: Some(inbox),\n"
+    hook = '''        // Window > Data Merge sends "spp:data-merge" to the page around the editor.
+        open_url: Some(Box::new(|url: &str| {
+            let Some(w) = web_sys::window() else { return };
+            if url.starts_with("spp:") {
+                if let Ok(Some(parent)) = w.parent() {
+                    let msg = js_sys::Object::new();
+                    let _ = js_sys::Reflect::set(&msg, &"spp".into(), &url.into());
+                    let _ = parent.post_message(&msg, "*");
+                }
+            } else {
+                let _ = w.open_with_url_and_target(url, "_blank");
+            }
+        })),
+'''
+    return s.replace(anchor, hook + anchor, 1)
+
+
+patch("crates/ui-egui/src/menus/tree.rs", add_menu_item, "Window > Data Merge")
+patch("crates/ui-egui/src/menus/ui_commands.rs", add_menu_command, "ui.dataMerge command")
+patch("crates/ui-egui/src/menus/run.rs", add_menu_run, "ui.dataMerge action")
+patch("apps/vectorcraft-web/src/web.rs", add_open_url_hook, "open_url hook")

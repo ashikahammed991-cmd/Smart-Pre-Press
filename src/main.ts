@@ -1,4 +1,5 @@
 import "./style.css";
+import { initDataMerge } from "./datamerge";
 import { initFonts } from "./fonts";
 import { initLicenseUi } from "./licenseui";
 import { effectiveRatio, autoRatio } from "./engine/cost";
@@ -566,4 +567,5 @@ renderResults();
   show(first);
 }
 initFonts();
+initDataMerge();
 initLicenseUi();
