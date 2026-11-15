@@ -71,3 +71,10 @@ Version 1.9.2: Auto Plate (imposition, ratio, costing, plate PDF), Vector Editor
 
 ## v1.9.4 – Windows fonts in the Vector Editor
 - The Windows fonts (C:\\Windows\\Fonts and your own installed fonts, files up to 15 MB) are loaded into the Vector Editor in the background after it starts, so they appear in its normal font list. The release workflow patches VectorCraft with `window.vectorcraft.addFont` for this.
+
+## v1.10.0 – Data Merge (like InDesign)
+- **Data Merge** button in the top bar opens a panel: *Select Data Source* (Excel .xlsx or CSV/TXT, first row = field names), a field list (select a text object in the Vector Editor and click a field to bind it), *Preview* with ◀ ▶ through the records, and *Create Merged PDF* (record range, template artboard, one record per page, or several records per page in a grid with page size, margin and gap).
+- It uses the editor's own variables and data sets (`dataset.import`, `variable.bind`, `dataset.select`, `document.export`).
+
+## v1.10.1
+- Data Merge reads CSV (UTF-8, or old ANSI) and Excel "Unicode Text" (.txt, UTF-16, tab separated) files, besides .xlsx.
