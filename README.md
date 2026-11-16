@@ -81,3 +81,6 @@ Version 1.9.2: Auto Plate (imposition, ratio, costing, plate PDF), Vector Editor
 
 ## v1.10.2 – Data Merge in the Window menu
 Data Merge is no longer a button in the top bar. Open it in the Vector Editor: **Window → Data Merge**.
+
+## v1.10.3
+The Data Merge panel can be dragged by its title bar (position remembered) and resized from its corner.

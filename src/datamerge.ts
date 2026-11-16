@@ -67,6 +67,39 @@ export function initDataMerge(): void {
     </div>`;
   document.body.appendChild(panel);
 
+  // Drag the panel by its title bar, like any other window; the position is remembered.
+  const head = panel.querySelector<HTMLElement>(".dm-head")!;
+  const place = (x: number, y: number): void => {
+    const nx = Math.min(Math.max(0, x), window.innerWidth - 80);
+    const ny = Math.min(Math.max(0, y), window.innerHeight - 40);
+    panel.style.left = nx + "px";
+    panel.style.top = ny + "px";
+    panel.style.right = "auto";
+  };
+  try {
+    const sv = JSON.parse(localStorage.getItem("spp-dm-pos") || "null") as { x: number; y: number } | null;
+    if (sv) place(sv.x, sv.y);
+  } catch { /* ignore */ }
+  head.addEventListener("pointerdown", (e) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    const r = panel.getBoundingClientRect();
+    const dx = e.clientX - r.left;
+    const dy = e.clientY - r.top;
+    head.setPointerCapture(e.pointerId);
+    const move = (m: PointerEvent): void => place(m.clientX - dx, m.clientY - dy);
+    const up = (): void => {
+      head.removeEventListener("pointermove", move);
+      head.removeEventListener("pointerup", up);
+      try {
+        const q = panel.getBoundingClientRect();
+        localStorage.setItem("spp-dm-pos", JSON.stringify({ x: q.left, y: q.top }));
+      } catch { /* ignore */ }
+    };
+    head.addEventListener("pointermove", move);
+    head.addEventListener("pointerup", up);
+    e.preventDefault();
+  });
+
   const $ = <T extends HTMLElement>(id: string): T => panel.querySelector("#" + id) as T;
   const msg = $("dm-msg");
   const say = (t: string, bad = false): void => {

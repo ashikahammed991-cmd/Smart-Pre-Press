@@ -108,9 +108,9 @@ details.advanced > summary { cursor: pointer; font-weight: 600; margin-bottom: 8
 
 #fonts-status { color: var(--dim); font-size: 12px; margin-left: 8px; }
 
-#dm-panel { position: fixed; top: 44px; right: 12px; z-index: 8000; width: 320px; max-height: calc(100vh - 60px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+#dm-panel { resize: both; min-width: 280px; position: fixed; top: 44px; right: 12px; z-index: 8000; width: 320px; max-height: calc(100vh - 60px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
 #dm-panel[hidden] { display: none; }
-.dm-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.dm-head { cursor: move; user-select: none; touch-action: none; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .dm-head button { padding: 0 8px; }
 .dm-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .dm-dim { color: var(--dim); font-size: 12px; font-weight: normal; }
